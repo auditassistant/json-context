@@ -1,0 +1,24 @@
+{
+  "author": "Matt McKegg <matt@wetsand.co.nz> (http://twitter.com/MattMcKegg)",
+  "name": "json-context",
+  "description": "Create a single object containing all data required to render a view/page that provides hooks to sync with server and data-bind with elements on the page. Browserify compatible.",
+  "version": "0.0.0",
+  "homepage": "http://github.com/mmckegg/node-json-context",
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/mmckegg/node-json-context.git"
+  },
+  "main": "json-context",
+  "scripts": {
+    "test": "node json-context.test.js"
+  },
+  "dependencies": {
+    "json-query": "*",
+    "json-change-filter": "*"
+  },
+  "devDependencies": {},
+  "optionalDependencies": {},
+  "engines": {
+    "node": "*"
+  }
+}
