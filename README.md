@@ -1,8 +1,8 @@
 # JSON Context
 
-This module allows a server to create a JSON Context- a single object containing all data required to render a view/page.  After it is sent to the client it provides hooks to sync with server and data-bind with elements on the page.
+This module allows a server to create a JSON Context - single object that supports querying and contains all data required to render a view/page. When sent to the client it also provides an event stream for syncing with server and data-binding.
 
-The module also provides a method for authentication of what data is allowed to be synced using JSON Change Filter and JSON Signer.
+It is intended to be used in conjunction with the modules [Realtime Templates](https://github.com/mmckegg/node-realtime-templates) and [JSON Syncer](https://github.com/mmckegg/node-json-syncer), however can be used standalone if that's what you're into.
 
 ## AJAX is so 2005...
 

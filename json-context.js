@@ -265,7 +265,7 @@ function mergeInto(original, changed){
     original.length = changed.length
   } else {
     Object.keys(original).filter(function(key){
-      return !isMeta(key) && (newKeys.indexOf(key) < 0)
+      return !isMeta(key) && (!~newKeys.indexOf(key))
     }).forEach(function(key){
       delete original[key]
     })
