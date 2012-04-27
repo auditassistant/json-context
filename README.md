@@ -180,7 +180,7 @@ And connect to the publisher we set up on the server:
     server.subscribe(function(object){
       
       // pipe all changes into context.pushChange
-      window.context.pushChange(object, {source: 'remote'})
+      window.context.pushChange(object, {source: 'server'})
       
     })
   })

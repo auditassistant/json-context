@@ -1,7 +1,7 @@
 //TODO: test events and pipes
 //TODO: test change filters
 
-var assert = require('assert')
+var test = require('tap').test
 
 var jsonContext = require('./json-context')
 
@@ -82,90 +82,100 @@ var matchers = [
   
 ]
 
+function runTests(){
 
-var tests = [
-  
-  function(data, context){p( "Test remote append to array collection" )
-    
-    var newComment = {_id: 'comment1', type: 'comment', post_id: 'abc123', user_id: null, anonymous_user: {name: "Bill Gates"}, body: "Here's $10000, have a nice day!"}
-    var comments = data.comments
-    
-    assertItemAdded(comments, function(){
-      context.pushChange(newComment, {source: 'remote'})
-      assert.equal(lastFrom(comments), newComment)
+  test("Server append to array collection", function(t){
+    freshData(function(data, context){
+      
+      var newComment = {_id: 'comment1', type: 'comment', post_id: 'abc123', user_id: null, anonymous_user: {name: "Bill Gates"}, body: "Here's $10000, have a nice day!"}
+      var comments = data.comments
+      
+      assertItemAdded(t, comments, function(){
+        context.pushChange(newComment, {source: 'server'})
+        t.equal(lastFrom(comments), newComment)
+      })
+      
+      t.end()
     })
-    
-  },
+  })  
   
-  function(data, context){p( "Test remote append non matching comment -> should ignore item" )
-    
-    var newComment = {_id: 'comment1', type: 'comment', post_id: 'unknown', user_id: null, anonymous_user: {name: "Free Money"}, body: "SPAM! SPAM! SPAM!"}
-    var comments = data.comments
-    
-    assertItemNotAdded(comments, function(){
-      context.pushChange(newComment, {source: 'remote'})
-      assert.notEqual(lastFrom(comments), newComment)
+  test("Server append non matching comment -> should ignore item", function(t){
+    freshData(function(data, context){
+      
+      var newComment = {_id: 'comment1', type: 'comment', post_id: 'unknown', user_id: null, anonymous_user: {name: "Free Money"}, body: "SPAM! SPAM! SPAM!"}
+      var comments = data.comments
+      
+      assertItemNotAdded(t, comments, function(){
+        context.pushChange(newComment, {source: 'server'})
+        t.notEqual(lastFrom(comments), newComment)
+      })
+      
+      t.end()
     })
-    
-  },
+  })
   
-  function(data, context){p( "Test remote update single item without collection -> should still be same reference obj but new content" )
-    
-    var changedPost = {_id: 'abc123', type: 'post', title: 'New title', body: "SPAM! SPAM! SPAM!"}
-    var post = data.post
-    
-    context.pushChange(changedPost, {source: 'remote'})
-    
-    var updatedPost = context.get('post')
-    
-    assert.deepEqual(updatedPost, changedPost)
-    assert.notEqual(updatedPost, changedPost)
-    
-    assert.equal(post, updatedPost)
-    
-  },
-  
-  function(data, context){p( "Test delete item from collection" )
-    
-    var changedComment = {_id: 'cba123', type: 'comment', post_id: 'abc123', _deleted: true}
-    var comment = context.get('comments[_id={._id}]', changedComment)
-    
-    assertItemRemoved(data.comments, function(){
-      context.pushChange(changedComment, {source: 'remote'})      
+  test("Server update single item without collection -> should still be same reference obj but new content", function(t){
+    freshData(function(data, context){
+      
+      var changedPost = {_id: 'abc123', type: 'post', title: 'New title', body: "SPAM! SPAM! SPAM!"}
+      var post = data.post
+      
+      context.pushChange(changedPost, {source: 'server'})
+      
+      var updatedPost = context.get('post')
+      
+      t.deepEqual(updatedPost, changedPost)
+      t.notEqual(updatedPost, changedPost)
+      
+      t.equal(post, updatedPost)
+      
+      t.end()
     })
+  })
     
-    assert.equal(context.get('comments[_id={._id}]', changedComment), null)
-    
-  }
-  
-]
+  test("Delete item from collection", function(t){
+    freshData(function(data, context){
+      
+      var changedComment = {_id: 'cba123', type: 'comment', post_id: 'abc123', _deleted: true}
+      var comment = context.get('comments[_id={._id}]', changedComment)
+      
+      assertItemRemoved(t, data.comments, function(){
+        context.pushChange(changedComment, {source: 'server'})      
+      })
+      
+      t.equal(context.get('comments[_id={._id}]', changedComment), null)
+      
+      t.end()
+    })
+  })
 
-
-
-function assertItemAdded(collection, func){
-  var length = collection.length
-  func()
-  assert.equal(collection.length, length + 1, "Item was not added")
 }
 
-function assertItemRemoved(collection, func){
+
+function assertItemAdded(t, collection, func){
   var length = collection.length
   func()
-  assert.equal(collection.length, length - 1, "Item was not removed")
+  t.equal(collection.length, length + 1, "Item should be added")
 }
 
-function assertItemNotAdded(collection, func){
+function assertItemRemoved(t, collection, func){
   var length = collection.length
   func()
-  assert.equal(collection.length, length, "Item was added when it shouldn't")
+  t.equal(collection.length, length - 1, "Item should be removed")
+}
+
+function assertItemNotAdded(t, collection, func){
+  var length = collection.length
+  func()
+  t.equal(collection.length, length, "Item shouldn't be added")
 }
 
 var jsonData = JSON.stringify(data)
-tests.forEach(function(test){
+function freshData(func){
   var data = JSON.parse(jsonData)
   var context = jsonContext(data, {matchers: matchers})
-  test(data, context)
-})
+  func(data, context)
+}
 
 function p(text){
   console.info(text)
@@ -174,3 +184,5 @@ function p(text){
 function lastFrom(array){
   return array[array.length-1]
 }
+
+runTests()

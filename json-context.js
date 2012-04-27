@@ -8,33 +8,44 @@ module.exports = function(data, options){
   
   var options = options || {}
   
-  var context = jsonChangeStream(function(object, changeInfo){
-    
-    var matchers = getMatchers(object, changeInfo)
-    
-    matchers.forEach(function(matcher){
-      handleChange(object, mergeClone(changeInfo, {matcher: matcher}))
-    })
-    
-  })
+  // main pipe/router
+  var context = jsonChangeStream.connect(
+    jsonChangeFilter({
+      originalHandler: function(object, changeInfo){
+        var matcher = changeInfo.matchers[0]
+        return matcher && context.get(matcher.item, object)
+      },
+      matchers: function(object, changeInfo, iterate){
+        context.matchers.forEach(iterate)
+      }
+    }), function(object, changeInfo){
+      if (changeInfo.action == 'remove' || changeInfo.action == 'moved'){
+        remove(object, changeInfo)
+      } else if(changeInfo.action == 'append'){
+        append(object, changeInfo)
+      } else if (changeInfo.action == 'update'){
+        if (inCorrectCollection(object, changeInfo)){
+          update(object, changeInfo)
+        } else {
+          remove(changeInfo.original, changeInfo)
+          append(object, changeInfo)
+        }
+      }
+    }
+  )
   
   context.data = data
   context.dataFilters = options.dataFilters || {}
-  
   context.matchers = options.matchers || context.data.$matchers || []
-  
   context._isContext = true
   
   context.get = function(path, object, options){
     return context.query(path, object, options).value
   }
-  
   context.obtain = function(path, object, options){
     return deepClone(context.query(path, object, options).value)
   }
-  
   context.query = function(path, object, options){
-    
     // set up options
     var defaultOptions = {rootContext: context.data, context: object, filters: context.dataFilters}
     if (options){
@@ -42,12 +53,13 @@ module.exports = function(data, options){
         defaultOptions[key] = options[key]
       })
     }
-    
     return jsonQuery(path, defaultOptions)
   }
   
+  
+  
+  
   function update(newObject, changeInfo){
-    
     var query = context.query(changeInfo.matcher.item, newObject)
     if (query.value){
             
@@ -55,26 +67,17 @@ module.exports = function(data, options){
         , collection = jsonQuery.lastParent(query)
       
       var original = deepClone(object)
-      
       changeInfo = mergeClone(changeInfo, {action: 'update', collection: collection, original: original})
       
-      if (checkChangeFilter(object, changeInfo)){
-        // merge new object into old object preserving references when it can
-        mergeInto(object, newObject)
+      mergeInto(object, newObject)
 
-        // notify changes
-        context.emit('change', object, changeInfo)
-      }
-      
+      // notify changes
+      context.emit('change', object, changeInfo)
     }
-    
-
   }
   
   function remove(object, changeInfo){
     // remove item from context
-    
-    
     var query = context.query(changeInfo.matcher.item, object)
     var collection = jsonQuery.lastParent(query)
     
@@ -83,24 +86,19 @@ module.exports = function(data, options){
       var deletedObject = mergeClone(query.value, {_deleted: true})
       changeInfo = mergeClone(changeInfo, {action: 'remove', collection: collection, original: query.value, key: query.key, filter: changeInfo.matcher.filter})
       
-      if (checkChangeFilter(deletedObject, changeInfo)){
       
-        if (Array.isArray(collection)){
-          collection.splice(query.key, 1)
-        } else {
-          delete collection[query.key]
-        }
-        
-        context.emit('change', deletedObject, changeInfo)
-        
+      if (Array.isArray(collection)){
+        collection.splice(query.key, 1)
+      } else {
+        delete collection[query.key]
       }
       
+      context.emit('change', deletedObject, changeInfo)
+        
     }
-
   }
   
   function append(newObject, changeInfo){
-    
     if (changeInfo.matcher.collectionKey){
       
       // collection is not an array so we need to set the key manually
@@ -111,98 +109,41 @@ module.exports = function(data, options){
         
         changeInfo = mergeClone(changeInfo, {action: 'append', collection: collection, key: key, filter: changeInfo.matcher.filter})
         
-        if (checkChangeFilter(newObject, changeInfo)){
-        
-          if (query.value[key]){
-            // this key is being overwritten so emit object removal
-            context.emit('change', 
-              mergeClone(query.value[key], {_deleted: true}), 
-              mergeClone(changeInfo, {action: 'remove', collection: collection, original: query.value[key]})
-            )
-          }
-          
-          query.value[key] = newObject
-          context.emit('change', newObject, changeInfo)
+        if (query.value[key]){
+          // this key is being overwritten so emit object removal
+          context.emit('change', 
+            mergeClone(query.value[key], {_deleted: true}), 
+            mergeClone(changeInfo, {action: 'remove', collection: collection, original: query.value[key]})
+          )
         }
         
+        query.value[key] = newObject
+        context.emit('change', newObject, changeInfo)        
       }
     } else {
       
       var collection = context.get(changeInfo.matcher.collection, newObject, {force: []})
       changeInfo = mergeClone(changeInfo, {action: 'append', collection: collection, key: collection.length-1, filter: changeInfo.matcher.filter})
       
-      if (checkChangeFilter(newObject, changeInfo)){
-        collection.push(newObject)
-        context.emit('change', newObject, changeInfo)
+      collection.push(newObject)
+      context.emit('change', newObject, changeInfo)
+    }
+  }
+  
+  function inCorrectCollection(object, changeInfo){
+    if (changeInfo.matcher.collection){
+      var itemMatch = context.query(changeInfo.matcher.item, object)
+        , collectionMatch = context.get(changeInfo.matcher.collection, object, {force: []})
+        , currentCollection = jsonQuery.lastParent(itemMatch)
+      
+      if (itemMatch.value){
+        return collectionMatch === currentCollection
       }
-      
     }
-  }
-  
-  function handleChange(object, changeInfo){
-    
-    var matcher = changeInfo.matcher
-    
-    if (object._deleted){
-      
-      // item has been deleted, get rid of it locally
-      remove(object, changeInfo)
-      
-    } else {
-      
-      var itemMatch = context.query(matcher.item, object)
-      
-      if (matcher.collection){
-        var collectionMatch = context.query(matcher.collection, object, {force: []})
-          , currentCollection = jsonQuery.lastParent(itemMatch)
-        
-        if (itemMatch.value){
-          if (collectionMatch.value === currentCollection){
-            // item is in the right collection, just update the params
-            update(object, changeInfo)
-          } else {
-            // item is not in the right collection. Remove the old one and add the new one in the correct place
-            remove(object, changeInfo)
-            append(object, changeInfo)
-          }
-        } else {
-          // this is a new item, go ahead and append it
-          append(object, changeInfo)
-        }
-      } else {
-        // if there is no collection, just update the item
-        update(object, changeInfo)
-      }
-      
-    }
-  }
-  
-  function getMatchers(object, changeInfo){
-    var matchers = context.matchers || []
-    changeInfo = changeInfo || {}
-    if (!changeInfo.matcher){
-      return matchers.filter(function(matcher){
-        return !!jsonChangeFilter(matcher.filter.match, object, {original: changeInfo.original})
-      })
-    } else {
-      return [changeInfo.matcher]
-    }
-  }
-  
-  return context
-}
-
-
-function checkChangeFilter(object, changeInfo){
-  if (changeInfo.matcher && changeInfo.matcher.filter.change && isLocal(changeInfo.source)){
-    jsonChangeFilter(changeInfo.matcher.filter.change, object, {original: changeInfo.original})
-  } else {
     return true
   }
-}
-
-function isLocal(source){
-  return (!source || source === 'local' || source._isLocal)
+ 
+  return context
 }
 
 function mergeInto(original, changed){
