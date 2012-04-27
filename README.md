@@ -214,27 +214,35 @@ This is where things start to get interesting. Let's back up a little and add a 
     
     // new stuff here!
     $matchers: [
-    
-      // subscribe to changes on blog post
-      { matchFilter: {
-          _id: 'abc123',
-          type: 'post'
+      
+      { // subscribe to changes on blog post
+        filter: {
+          match: {
+            _id: 'abc123',
+            type: 'post'
+          }
         },
         item: 'post' // a JSON Query telling where to update
       },
       
-      // subscribe to comments (both new and updates)
-      { matchFilter: {
-          post_id: 'abc123',
-          type: 'comment'
+      
+      { // subscribe to comments (both new and updates)
+        filter: {
+          match: {
+            post_id: 'abc123',
+            type: 'comment'
+          }
         },
         item: 'comments[_id={._id}]',   // a JSON Query telling where to find item to update
         collection: 'comments'          // a JSON Query telling where to add new items
       },
       
-      // subscribe to users (maybe I might change my name or something?)
-      { matchFilter: {
-          type: 'user'
+      
+      { // subscribe to users (maybe I might change my name or something?)
+        filter: {
+          match: {
+            type: 'user'
+          }
         },
         item: 'users[{._id}]',  // JSON Query: where to find item to update
         collection: 'users',    // JSON Query: where to add new items

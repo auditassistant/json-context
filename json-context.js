@@ -1,4 +1,4 @@
-var EventEmitter = require('events').EventEmitter
+var jsonChangeStream = require('json-change-stream')
   , jsonQuery = require('json-query')
   , jsonChangeFilter = require('json-change-filter')
   
@@ -8,15 +8,7 @@ module.exports = function(data, options){
   
   var options = options || {}
   
-  var context = new EventEmitter()
-  
-  context.data = data
-  context.dataFilters = options.dataFilters || {}
-  
-  context._isContext = true
-  
-  
-  context.pushChange = function(object, changeInfo){
+  var context = jsonChangeStream(function(object, changeInfo){
     
     var matchers = getMatchers(object, changeInfo)
     
@@ -24,10 +16,21 @@ module.exports = function(data, options){
       handleChange(object, mergeClone(changeInfo, {matcher: matcher}))
     })
     
+  })
+  
+  context.data = data
+  context.dataFilters = options.dataFilters || {}
+  
+  context.matchers = options.matchers || context.data.$matchers || []
+  
+  context._isContext = true
+  
+  context.get = function(path, object, options){
+    return context.query(path, object, options).value
   }
   
-  context.get = function(path, object){
-    return context.query(path, object, options).value
+  context.obtain = function(path, object, options){
+    return deepClone(context.query(path, object, options).value)
   }
   
   context.query = function(path, object, options){
@@ -43,43 +46,6 @@ module.exports = function(data, options){
     return jsonQuery(path, defaultOptions)
   }
   
-  context.pipe = function(destination, filter){
-    
-    var overflow = []
-    var state = 1
-    
-    var pipe = {
-      destination: destination,
-      handler: function(object, changeInfo){
-        if (!pipe.filter || pipe.filter(object, changeInfo)){
-          if (state === 1){
-            pipe.destination.pushChange(object, changeInfo)
-          } else if (state === 0){
-            overflow.push([object, changeInfo])
-          }
-        }
-      },
-      flush: function(){
-        overflow.forEach(function(item){
-          pipe.handler(item[0], item[1])
-        })
-        overflow.clear()
-      },
-      stop: function(){ state = -1 },
-      destroy: function(){ context.removeListener('change', pipe.handler) },
-      pause: function(){ state = 0 },
-      filter: filter,
-      resume: function(){
-        pipe.flush()
-        state = 1
-      }
-    }
-
-    context.on('change', pipe.handler)
-    
-    return pipe
-  }
-  
   function update(newObject, changeInfo){
     
     var query = context.query(changeInfo.matcher.item, newObject)
@@ -92,7 +58,7 @@ module.exports = function(data, options){
       
       changeInfo = mergeClone(changeInfo, {action: 'update', collection: collection, original: original})
       
-      if (checkLocalFilter(object, changeInfo)){
+      if (checkChangeFilter(object, changeInfo)){
         // merge new object into old object preserving references when it can
         mergeInto(object, newObject)
 
@@ -115,9 +81,9 @@ module.exports = function(data, options){
     if (collection && query.key != null){
       
       var deletedObject = mergeClone(query.value, {_deleted: true})
-      changeInfo = mergeClone(changeInfo, {action: 'remove', collection: collection, original: query.value, key: query.key})
+      changeInfo = mergeClone(changeInfo, {action: 'remove', collection: collection, original: query.value, key: query.key, filter: changeInfo.matcher.filter})
       
-      if (checkLocalFilter(deletedObject, changeInfo)){
+      if (checkChangeFilter(deletedObject, changeInfo)){
       
         if (Array.isArray(collection)){
           collection.splice(query.key, 1)
@@ -143,9 +109,9 @@ module.exports = function(data, options){
       
       if (key != null){
         
-        changeInfo = mergeClone(changeInfo, {action: 'append', collection: collection, key: key})
+        changeInfo = mergeClone(changeInfo, {action: 'append', collection: collection, key: key, filter: changeInfo.matcher.filter})
         
-        if (checkLocalFilter(newObject, changeInfo)){
+        if (checkChangeFilter(newObject, changeInfo)){
         
           if (query.value[key]){
             // this key is being overwritten so emit object removal
@@ -163,9 +129,9 @@ module.exports = function(data, options){
     } else {
       
       var collection = context.get(changeInfo.matcher.collection, newObject, {force: []})
-      changeInfo = mergeClone(changeInfo, {action: 'append', collection: collection, key: collection.length-1})
+      changeInfo = mergeClone(changeInfo, {action: 'append', collection: collection, key: collection.length-1, filter: changeInfo.matcher.filter})
       
-      if (checkLocalFilter(newObject, changeInfo)){
+      if (checkChangeFilter(newObject, changeInfo)){
         collection.push(newObject)
         context.emit('change', newObject, changeInfo)
       }
@@ -212,11 +178,11 @@ module.exports = function(data, options){
   }
   
   function getMatchers(object, changeInfo){
-    var matchers = data.$matchers || []
+    var matchers = context.matchers || []
     changeInfo = changeInfo || {}
     if (!changeInfo.matcher){
       return matchers.filter(function(matcher){
-        return !!jsonChangeFilter(matcher.matchFilter, object, {original: changeInfo.original})
+        return !!jsonChangeFilter(matcher.filter.match, object, {original: changeInfo.original})
       })
     } else {
       return [changeInfo.matcher]
@@ -227,9 +193,9 @@ module.exports = function(data, options){
 }
 
 
-function checkLocalFilter(object, changeInfo){
-  if (changeInfo.matcher && changeInfo.matcher.localFilter && isLocal(changeInfo.source)){
-    jsonChangeFilter(changeInfo.matcher.localFilter, object, {original: changeInfo.original})
+function checkChangeFilter(object, changeInfo){
+  if (changeInfo.matcher && changeInfo.matcher.filter.change && isLocal(changeInfo.source)){
+    jsonChangeFilter(changeInfo.matcher.filter.change, object, {original: changeInfo.original})
   } else {
     return true
   }

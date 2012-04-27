@@ -1,4 +1,5 @@
 //TODO: test events and pipes
+//TODO: test change filters
 
 var assert = require('assert')
 
@@ -41,37 +42,45 @@ var data = {
       post_id: 'abc123',
       body: "Thanks, it's because I'm using Node.js with JSON Context. Sorry, I don't want to link to your site because it's built with php..."
     }
-  ],
-  $matchers: [
-  
-    // subscribe to changes on blog post
-    { matchFilter: {
-        _id: 'abc123',
-        type: 'post'
-      },
-      item: 'post' // a JSON Query telling where to update
-    },
-    
-    // subscribe to comments (both new and updates)
-    { matchFilter: {
-        post_id: 'abc123',
-        type: 'comment'
-      },
-      item: 'comments[_id={._id}]',   // a JSON Query telling where to find item to update
-      collection: 'comments'          // a JSON Query telling where to add new items
-    },
-    
-    // subscribe to users (maybe I might change my name or something?)
-    { matchFilter: {
-        type: 'user'
-      },
-      item: 'users[{._id}]',  // JSON Query: where to find item to update
-      collection: 'users',    // JSON Query: where to add new items
-      collectionKey: '._id'   // as the collection in this case is not an array, what should it's key be?
-    }
-    
   ]
 }
+
+var matchers = [
+
+  { // subscribe to changes on blog post
+    filter: {
+      match: {
+        _id: 'abc123',
+        type: 'post'
+      }
+    },
+    item: 'post' // a JSON Query telling where to update
+  },
+  
+  { // subscribe to comments (both new and updates)
+    filter: {
+      match: {
+        post_id: 'abc123',
+        type: 'comment'
+      }
+    },
+    item: 'comments[_id={._id}]',   // a JSON Query telling where to find item to update
+    collection: 'comments'          // a JSON Query telling where to add new items
+  },
+  
+  
+  { // subscribe to users (maybe I might change my name or something?)
+    filter: {
+      match: {
+        type: 'user'
+      }
+    },
+    item: 'users[{._id}]',  // JSON Query: where to find item to update
+    collection: 'users',    // JSON Query: where to add new items
+    collectionKey: '._id'   // as the collection in this case is not an array, what should it's key be?
+  }
+  
+]
 
 
 var tests = [
@@ -154,7 +163,7 @@ function assertItemNotAdded(collection, func){
 var jsonData = JSON.stringify(data)
 tests.forEach(function(test){
   var data = JSON.parse(jsonData)
-  var context = jsonContext(data)
+  var context = jsonContext(data, {matchers: matchers})
   test(data, context)
 })
 
