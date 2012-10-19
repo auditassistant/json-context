@@ -4,6 +4,10 @@ This module allows a server to create a JSON Context - single object that suppor
 
 It is intended to be used in conjunction with the modules [Realtime Templates](https://github.com/mmckegg/node-realtime-templates) and [JSON Syncer](https://github.com/mmckegg/node-json-syncer), however can be used standalone if that's what you're into.
 
+## Work in progress
+
+None of this stuff is up on NPM yet...
+
 ## AJAX is so 2005...
 
 We don't want to wait for loading. **Ajax makes you wait all the time.**
