@@ -203,5 +203,5 @@ function mergeClone(){
 }
 
 function isMeta(key){
-  return (key.charAt(0) === '$')
+  return (typeof key === 'string' && key.charAt(0) === '$')
 }
