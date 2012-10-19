@@ -5,6 +5,7 @@ var jsonChangeStream = require('json-change-stream')
   
 module.exports = function(data, options){
   // options: dataFilters
+  // options: dataFilters, matchers
   
   var options = options || {}
   
@@ -56,8 +57,16 @@ module.exports = function(data, options){
     return jsonQuery(path, defaultOptions)
   }
   
+  context.queryFor = function(object){
+    var matchers = context.matchersFor(object)
+    if (matchers.length > 0){
+      return context.query(matchers[0].item, object)
+    }
+  }
   
-  
+  context.matchersFor = function(object){
+    return jsonChangeFilter.findMatchers(object, context.matchers)
+  }
   
   function update(newObject, changeInfo){
     var query = context.query(changeInfo.matcher.item, newObject)
@@ -178,6 +187,9 @@ function mergeInto(original, changed){
     })
   }
   
+module.exports.lastParent = jsonQuery.lastParent
+module.exports.obtain = function(object){
+  return deepClone(object)
 }
 
 function deepClone(object){
