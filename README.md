@@ -2,7 +2,7 @@
 
 This module allows a server to create a JSON Context - single object that supports querying and contains all data required to render a view/page. When sent to the client it also provides an event stream for syncing with server and data-binding.
 
-It is intended to be used in conjunction with the modules [Realtime Templates](https://github.com/mmckegg/node-realtime-templates) and [JSON Syncer](https://github.com/mmckegg/node-json-syncer), however can be used standalone if that's what you're into.
+It is intended to be used in conjunction with the modules [Realtime Templates](https://github.com/mmckegg/realtime-templates) and [JSON Syncer](https://github.com/mmckegg/node-json-syncer), however can be used standalone if that's what you're into.
 
 ## Work in progress
 
@@ -69,7 +69,7 @@ The data can come from anywhere... Mysql, CouchDB, JSON files ... it's up to you
 
 Once we have the data we need nicely packaged up in a single JSON object, it's time to use that data to render our web page.
 
-Here's a stupid simple template example using **embedded js (ejs)**.... Don't try this at home (instead use [Realtime Templates](https://github.com/mmckegg/node-realtime-templates))
+Here's a stupid simple template example using **embedded js (ejs)**.... Don't try this at home (instead use [Realtime Templates](https://github.com/mmckegg/realtime-templates))
 
 ```html
 
@@ -360,4 +360,4 @@ No it's not. You did all the work. JSON Context is just one tool that made it ea
 Here are some more tools to make it even easier:
 
   - [JSON Syncer](http://github.com/mmckegg/node-json-syncer) - Handles all of the change pushing between server and client. Allows subscribing to only specific events - no need to overload every user with every little thing no matter how irrelevant. Also provides a way to send the user's changes back to the server.
-  - [Realtime Templates](http://github.com/mmckegg/node-realtime-templates) - This is where it all comes together. Write your views in 100% pure HTML markup. You can bind elements using JSON Query to your context, and create repeating areas, conditionals, partials, and much more. The server renders the initial page, but best part is that the view is automatically shared with the browser so **you don't need to write a single line of refresh code**. The view already knows how to update itself. Things start to actually be magic at this point.
+  - [Realtime Templates](http://github.com/mmckegg/realtime-templates) - This is where it all comes together. Write your views in 100% pure HTML markup. You can bind elements using JSON Query to your context, and create repeating areas, conditionals, partials, and much more. The server renders the initial page, but best part is that the view is automatically shared with the browser so **you don't need to write a single line of refresh code**. The view already knows how to update itself. Things start to actually be magic at this point.
