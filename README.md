@@ -110,7 +110,7 @@ In this example we tribute the good old days of the internet... where sites were
   alert('Hi ' + userName + ', welcome to my blog!!')
 ```
 
-That was an example of using [JSON Query](https://github.com/mmckegg/node-json-query) which is *included for free* with every JSON Context. You can use it to pluck single values or **nested queries** like we see above. `current_user_id` is one query and the result is inserted into the outer query to end up with something that looks like `users[abc234].name` which is then run against the original data we provided.
+That was an example of using [JSON Query](https://github.com/mmckegg/json-query) which is *included for free* with every JSON Context. You can use it to pluck single values or **nested queries** like we see above. `current_user_id` is one query and the result is inserted into the outer query to end up with something that looks like `users[abc234].name` which is then run against the original data we provided.
 
 #### OK, so what happens when the data changes on the server?
 
@@ -255,7 +255,7 @@ This is where things start to get interesting. Let's back up a little and add a 
   }
 ```
 
-Whenever a JSON Context object receives a `pushChange` command, it runs the new change against every matcher stored in `data._matchers` using [JSON Change Filter](https://github.com/mmckegg/node-json-change-filter).
+Whenever a JSON Context object receives a `pushChange` command, it runs the new change against every matcher stored in `data._matchers` using [JSON Change Filter](https://github.com/mmckegg/json-change-filter).
 
 It uses this information to update the local context (`window.context`) and generates events describing how it modified the data so that we know what to change in the DOM.
 
