@@ -18,7 +18,7 @@ The only time that loading is acceptable is when switching contexts - i.e. switc
 
 ## JSON Context Is A New Way To Write Data-Backed Sites
 
-The first step is deciding all of the data needed to render a page. This is as simple as building a JSON object.
+The first step is deciding **all of the data needed to render a page** and the most efficient structure for that data. This is as simple as building a JSON object.
 
 ```js
   
@@ -116,36 +116,40 @@ That was an example of using [JSON Query](https://github.com/mmckegg/node-json-q
 
 Nothing, yet. So far this is all pretty useless, apart from keeping your templates nicely organized (no code should be in your templates, etc).
 
-What we need to do is somehow wire up a change stream from the server to the client. [DNode](https://github.com/substack/dnode) is an excellent choice for this. 
+What we need to do is somehow wire up a change stream from the server to the client. [Shoe](https://github.com/substack/shoe) is an excellent choice for this. 
 
-> [DNode](https://github.com/substack/dnode) is an asynchronous object-oriented RPC system for node.js that lets you call remote functions.
-
-> It works over network sockets and even in the browser with [socket.io](https://github.com/learnboost/socket.io).
 
 ### Back on the server
 
-Here is an example change subscription service using [DNode](https://github.com/substack/dnode):
+Here is an example change subscription service using [Shoe](https://github.com/substack/shoe):
 
 ```js
 
-  var subscribers = {}
-  var DNode = require('dnode')
+  var subscribers = []
+  var shoe = require('shoe')
   
-  var publisher = DNode(function(client, conn){
-    this.subscribe = function(emit){
-      
-      // save the emit function for later. We'll call it with every change.
-      subscribers[conn.id] = emit
-      
-      // remove subscription when client disconnects
-      conn.on('end', function(){
-        delete subscribers[conn.id]
-      })
-      
-    }
+  var publisher = shoe(function(stream){
+    
+    // add the subscription
+    subscribers.push(stream)
+    
+    stream.on('end', function () {
+      // remove the subscription
+      var index = subscribers.indexOf(stream)
+      subscribers.splice(index, 1)
+    });
+    
   })
   
-  publisher.listen(httpServer)
+  
+  function pushChange(object){
+    var data = JSON.stringify(object)
+    subscribers.forEach(function(stream){
+      stream.write(data + '\n')
+    })
+  }
+  
+  publisher.install(httpServer, '/changes')
   
 ```
 
@@ -155,12 +159,7 @@ Let's hook in to the CouchDB changes feed using [Follow](https://github.com/iris
   var follow = require('follow');
   follow({db: "http://localhost:5984/blog", include_docs: true}, function(err, change) {
     if(!err){
-      
-      // loop over every subscriber and send them the new object/change
-      Object.keys(subscribers).forEach(function(id){
-        subscribers[id](change.doc)
-      })
-      
+      pushChange(change.doc)
     }
   })
 ```
@@ -169,25 +168,24 @@ Let's hook in to the CouchDB changes feed using [Follow](https://github.com/iris
 
 The part we've all been waiting for. Let's make this site work in realtime!
 
-Once again let's use [Browserify](https://github.com/substack/node-browserify) to pull in the browser version of [DNode](https://github.com/substack/dnode).
+Once again let's use [Browserify](https://github.com/substack/node-browserify) to pull in the browser version of [Shoe](https://github.com/substack/shoe)
 
 ```js
 
   // client-side require using browserify
-  var DNode = require('dnode')
+  var shoe = require('shoe')
 ```
 
-And connect to the publisher we set up on the server:
+And connect to the publisher we set up on the server (using [split](https://github.com/dominictarr/split) to ensure we receive whole lines):
 
 ```js
-  DNode.connect(function(server){
-    server.subscribe(function(object){
-      
-      // pipe all changes into context.pushChange
-      window.context.pushChange(object, {source: 'server'})
-      
-    })
+
+  var split = require('split')
+  
+  shoe('/changes').pipe(split()).on('data', function(line){
+    window.context.pushChange(JSON.parse(line), {source: 'server'})
   })
+
 ```
 
 #### So what's this `pushChange` thing?
@@ -265,13 +263,13 @@ It uses this information to update the local context (`window.context`) and gene
 
 So now that we have our little pub/sub going on, all changes made to the database are automatically updating the relevant parts of our local context (`window.context`).
 
-Let's tell the post elements how to automatically update if needed:
+Let's tell the post elements how to automatically update if needed (by extending the dom with some hack functions):
 
 ```js
   
   var postTitleElement = document.getElementById('post_title')
   postTitleElement.update = function(object){
-    postTitleElement.innerHTML = object.title
+    postTitleElement.innerHTML = object.title //this should really be html escaped...
   }
   
   var postBodyElement = document.getElementById('post_body')
@@ -279,7 +277,7 @@ Let's tell the post elements how to automatically update if needed:
     postBodyElement.innerHTML = object.body
   }
   
-  // tell the context what elements should be refreshed when the post changes
+  // add some metadata to the post showing what elements should be refreshed when the post changes
   var post = window.context.get('post')
   post.$elements = [postTitleElement, postBodyElement]
 
@@ -319,6 +317,12 @@ And now comments:
   })
 ```
 
+### What's with the '$' keys?
+
+In case you're wondering about the '$' keys (e.g. `$elements`) - there's nothing special about these, except that they are ignored by the updater and left in place. What this means is you can use them for storing metadata about an object. Even after the object is updated by `pushChange` the meta data will still be there. 
+
+The only way a '$' key can get lost is if the item is removed. Makes them great for storing binding info.
+
 #### But this still won't actually do anything yet
 
 We need to subscribe to the `change` event on `window.context`
@@ -349,17 +353,11 @@ We need to subscribe to the `change` event on `window.context`
   
 ```
 
-### What's with the '$' keys?
-
-In case you're wondering about the '$' keys (e.g. `$elements`) - there's nothing special about these, except that they are ignored by the updater and left in place. What this means is you can use them for storing metadata about an object. Even after the object is updated by `pushChange` the meta data will still be there. 
-
-The only way a '$' key can get lost is if the item is removed. Makes them great for storing binding info.
-
 ## WOW OMG!! EVERYTHING WORKS IN REALTIME!!! IT'S MAGIC!!
 
 No it's not. You did all the work. JSON Context is just one tool that made it easier.
 
 Here are some more tools to make it even easier:
 
-  - [JSON Syncer](http://github.com/mmckegg/node-json-syncer) - Handles all of the change pushing between server and client. Allows subscribing to only specific events - no need to overload every user with every little thing no matter how irrelevant. Also provides a way to send the user's changes back to the server. Comes with handy dandy permissions/authentication!
+  - [JSON Syncer](http://github.com/mmckegg/node-json-syncer) - Handles all of the change pushing between server and client. Allows subscribing to only specific events - no need to overload every user with every little thing no matter how irrelevant. Also provides a way to send the user's changes back to the server.
   - [Realtime Templates](http://github.com/mmckegg/node-realtime-templates) - This is where it all comes together. Write your views in 100% pure HTML markup. You can bind elements using JSON Query to your context, and create repeating areas, conditionals, partials, and much more. The server renders the initial page, but best part is that the view is automatically shared with the browser so **you don't need to write a single line of refresh code**. The view already knows how to update itself. Things start to actually be magic at this point.

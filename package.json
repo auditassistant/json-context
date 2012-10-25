@@ -14,9 +14,12 @@
   },
   "dependencies": {
     "json-query": "*",
-    "json-change-filter": "*"
+    "json-change-filter": "*",
+    "json-change-stream": "*"
   },
-  "devDependencies": {},
+  "devDependencies": {
+    "tap": "*"
+  },
   "optionalDependencies": {},
   "engines": {
     "node": "*"
