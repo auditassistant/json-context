@@ -1,6 +1,7 @@
 var jsonChangeStream = require('json-change-stream')
   , jsonQuery = require('json-query')
   , jsonChangeFilter = require('json-change-filter')
+  , checkSorting = require('./check_sorting')
   
   
 module.exports = function(data, options){
@@ -61,6 +62,18 @@ module.exports = function(data, options){
   context.matchersFor = function(object){
     return jsonChangeFilter.findMatchers(object, context.matchers)
   }
+  
+  context.siblings = function(object){
+    var matcher = context.matchersFor(object)[0]
+    if (matcher){
+      var queryResult = context.query(matcher.item, object)
+      var collection = jsonQuery.lastParent(queryResult)
+      return {previous: collection[queryResult.key - 1], next: collection[queryResult.key + 1]}
+    } else {
+      return {}
+    }
+  }
+
   
   function update(newObject, changeInfo){
     
@@ -155,8 +168,10 @@ module.exports = function(data, options){
     var collection = jsonQuery.lastParent(query)
     
     if (collection && query.key != null){
+            
+      var deletedObject = query.value
+      query.value._deleted = true
       
-      var deletedObject = mergeClone(query.value, {_deleted: true})
       changeInfo = mergeClone(changeInfo, {action: 'remove', collection: collection, original: query.value, key: query.key, filter: changeInfo.matcher.filter})
       
       
@@ -227,63 +242,6 @@ module.exports = function(data, options){
         collectionMatch.push(object)
         
         return mergeClone(changeInfo, {key: collectionMatch.length-1, collection: collectionMatch, originalCollection: changeInfo.collection})
-      }
-    }
-    return changeInfo
-  }
-  
-  function checkSorting(object, changeInfo){
-    var collection = changeInfo.collection
-    var matcher = changeInfo.matcher
-
-    if (matcher.beforeSort && Array.isArray(collection)){
-      var beforeSorter = matcher.beforeSort
-      
-      var beforeKey = object[beforeSorter[0]]
-      if (beforeKey != null){
-        
-        // check to see if it is currently in correct location
-        var correctLocation = false
-        var index = changeInfo.key
-        if (beforeKey === -1){
-          if (index+1 === collection.length){
-            correctLocation = true
-          }
-        } else {
-          if (index < collection.length-1){
-            var currentBefore = collection[index+1]
-            if (currentBefore[beforeSorter[1]] === beforeKey){
-              correctLocation = true
-            }
-          }
-        }
-        
-        if (!correctLocation){
-          if (beforeKey === -1){
-            
-            // move to end
-            collection.splice(index, 1)
-            collection.push(object)
-            return mergeClone(changeInfo, {before: 'end', key: collection.length - 1})
-            
-          } else {                
-            
-            // or move to correct position
-            for (var i=0;i<collection.length;i++){
-              var beforeItem = collection[i]
-              if (beforeItem[beforeSorter[1]] === beforeKey){
-                if (i > index){
-                  i -= 1
-                }
-                collection.splice(index, 1)
-                collection.splice(i, 0, object)
-                return mergeClone(changeInfo, {before: beforeItem, key: i})
-              }
-            }
-            
-          }
-
-        }
       }
     }
     return changeInfo

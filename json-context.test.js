@@ -24,32 +24,6 @@ var data = {
     }
   },
   
-  links: [
-    { _id: 'link3',
-      type: 'link',
-      title: "Github",
-      url: 'https://github.com/mmckegg',
-      _before: 'link4'
-    },
-    { _id: 'link4',
-      type: 'link',
-      title: "Twitter",
-      url: 'https://twitter.com/MattMckegg',
-      _before: 'link1'
-    },
-    { _id: 'link1',
-      type: 'link',
-      title: "Node.js Website",
-      url: 'http://nodejs.org'
-    },
-    { _id: 'link2',
-      type: 'link',
-      title: "NPM Website",
-      url: 'http://npmjs.org'
-    },
-
-  ],
-  
   current_user_id: 'abc234',
   
   comments: [
@@ -104,17 +78,6 @@ var matchers = [
     item: 'users[{._id}]',  // JSON Query: where to find item to update
     collection: 'users',    // JSON Query: where to add new items
     collectionKey: '._id'   // as the collection in this case is not an array, what should it's key be?
-  },
-  
-  {
-    item: 'links[_id={._id}]',
-    collection: 'links',
-    beforeSort: ['_before', '_id'], // key[0]: target property // key[1]: collection identifing property
-    filter: {
-      match: {
-        type: 'link'
-      }
-    }
   }
   
 ]
@@ -181,55 +144,6 @@ function runTests(){
       })
       
       t.equal(context.get('comments[_id={._id}]', changedComment), null)
-      
-      t.end()
-    })
-  })
-  
-  test("Before sorting - move link3 to before link2", function(t){
-    freshData(function(data, context){
-      
-      var originalOrder = ['link3','link4','link1','link2']
-      var expectedOrder = ['link4','link1','link3','link2']
-      t.deepEqual(data.links.map(function(l){return l._id}), originalOrder, "Original match")
-      
-      var link = data.links[0]
-      
-      var linkQuery = context.query('links[_id=link3]')
-      var originalIndex = linkQuery.key
-      
-      
-      var changedLink = context.obtain('links[_id=link3]')
-      changedLink._before = 'link2'
-      
-      context.on('change', function(object, changeInfo){
-        if (object === link){
-          t.equal(changeInfo.before, data.links[3], 'Before changeInfo set on change event')
-        }
-      })
-      context.pushChange(changedLink, {source: 'server'})   
-      
-      var newOrder = data.links.map(function(l){return l._id})
-      
-      t.deepEqual(newOrder, expectedOrder)
-      
-      t.equal(data.links[2], link, 'Item moved by before-sort to position 2')
-      t.end()
-    })
-  })
-  
-  test("Before sorting move link3 to end", function(t){
-    freshData(function(data, context){
-    
-      var originalOrder = ['link3','link4','link1','link2']
-      var expectedOrder = ['link4','link1','link2','link3']
-      
-      var changedLink = context.obtain('links[_id=link3]')
-      changedLink._before = -1
-      context.pushChange(changedLink, {source: 'server'})   
-      
-      var newOrder = data.links.map(function(l){return l._id})
-      t.deepEqual(newOrder, expectedOrder)
       
       t.end()
     })
