@@ -23,5 +23,15 @@
   "optionalDependencies": {},
   "engines": {
     "node": "*"
-  }
+  },
+  "keywords": [
+    "data binding",
+    "json",
+    "query",
+    "offline",
+    "filter",
+    "change stream",
+    "realtime",
+    "matchers"
+  ]
 }

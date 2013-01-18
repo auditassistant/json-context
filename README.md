@@ -2,9 +2,13 @@
 
 This module allows a server to create a JSON Context - single object that supports querying and contains all data required to render a view/page. When sent to the client it also provides an event stream for syncing with server and data-binding.
 
-It is intended to be used in conjunction with the modules [Realtime Templates](https://github.com/mmckegg/realtime-templates) and [JSON Syncer](https://github.com/mmckegg/node-json-syncer), however can be used standalone if that's what you're into.
+It is intended to be used in conjunction with [Realtime Templates](https://github.com/mmckegg/realtime-templates) however can be used standalone if that's what you're into.
 
-## Work in progress
+## Installation
+
+```shell
+$ npm install json-context
+```
 
 None of this stuff is up on NPM yet...
 
