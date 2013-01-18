@@ -260,6 +260,16 @@ module.exports.obtain = function(object){
   return deepClone(object)
 }
 
+module.exports.obtainMerge = function(object, changes){
+  var result = deepClone(object)
+  if (changes){
+    Object.keys(changes).forEach(function(key){
+      result[key] = changes[key]
+    })
+  }
+  return result
+}
+
 function deepClone(object){
   return JSON.parse(JSON.stringify(object, function(k,v){
     // strip meta data from cloned
