@@ -13,8 +13,12 @@ module.exports = function(data, options){
   var context = jsonChangeStream.connect(
     jsonChangeFilter({
       originalHandler: function(object, changeInfo){
-        var matcher = changeInfo.matchers[0]
-        return matcher && context.get(matcher.item, object)
+        var original = null
+        changeInfo.matchers.some(function(matcher){
+          original = context.get(matcher.item, object)
+          return !!original
+        })
+        return original
       },
       matchers: function(object, changeInfo, iterate){
         context.matchers.forEach(iterate)
@@ -134,12 +138,12 @@ module.exports = function(data, options){
     }
     
     var query = context.query(changeInfo.matcher.item, newObject)
-    if (query.value){
-      
-            
-      var object = query.value
-        , collection = jsonQuery.lastParent(query)
-      
+    
+    var object = query.value
+      , collection = jsonQuery.lastParent(query)
+    
+    if (object){
+
       // sort item
       
       var original = deepClone(object)
@@ -159,6 +163,8 @@ module.exports = function(data, options){
 
       // notify changes
       context.emit('change', object, changeInfo)
+    } else {
+      append(newObject, changeInfo)
     }
   }
   
