@@ -76,18 +76,18 @@ function isConflict(object, destination, key){
 function getCorrectIndex(object, collection, options){
   var value = object[options.key]
   if (options.type === 'before'){
-    if (value === -1){
+    if (value == -1){
       return collection.length
     } else {
       return getMatchingIndex(collection, options.compareKey, value)
     }
     
   } else if (options.type === 'after'){
-    if (value === -1){
+    if (value == -1){
       return 0
     } else {
       var index = getMatchingIndex(collection, options.compareKey, value)
-      if (index === -1){
+      if (index == -1){
         return -1
       } else {
         return index + 1
@@ -112,7 +112,7 @@ function inCorrectLocation(object, collection, options){
   var index = options.index != null ? options.index : collection.indexOf(object)
   
   if (options.type === 'after'){
-    if (value === -1){
+    if (value == -1){
       return index === 0
     } else {
       if (index > 0){
@@ -122,7 +122,7 @@ function inCorrectLocation(object, collection, options){
     }
     
   } else if (options.type === 'before'){
-    if (value === -1){
+    if (value == -1){
       return index+1 === collection.length
     } else {
       if (index < collection.length-1){
