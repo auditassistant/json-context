@@ -36,7 +36,8 @@ Pushes an object into the datasource using the specified matchers to decide wher
 Because of this, if you have a reference to the original object in the datasource (say when you are binding to it), the reference will still work after the new version has been pushed in. This allows the complete object to be bounced around the intertubes or wherever and only update existing objects rather than creating new references all the time.
 
 **changeInfo**: 
-  - source: 'user' or 'server'
+  - source: 'user' or 'server' (also available: 'cache', 'database' which like server, bypass the change filters other than the base match)
+  - any other metadata that we may want to access further down stream.
 
 ### datasource.query(query, context, options)
 
@@ -121,6 +122,7 @@ To make things a little more interesting, this filter groups tasks by `heading_i
   item: 'tasks_by_heading[][id={.id}]',
   collection: 'tasks_by_heading[{.heading_id}]'
 }
+```
 
 ## Databinding
 
