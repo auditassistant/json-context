@@ -2,7 +2,11 @@
 
 This module allows a server to create a JSON Context - single object that supports querying and contains all data required to render a view/page. When sent to the client it also provides an event stream for syncing with server and data-binding.
 
+The idea is it works in a similar way to your database (well depends on the database), using a update whole object at once (i.e. row/document based) aproach. Any changes that come off our database can be streamed straight in and it will figure out what local objects and fields to update, and notify that the object has been changed.
+
 It is intended to be used in conjunction with [Realtime Templates](https://github.com/mmckegg/realtime-templates) however can be used standalone if that's what you're into.
+
+It's mostly a wrapper around [JSON Query](https://github.com/mmckegg/json-query) and [JSON Change Filter](https://github.com/mmckegg/json-change-filter) making it easy to get up and running with object change streams and hook up to data on both the server and client.
 
 ## Installation
 
@@ -10,358 +14,168 @@ It is intended to be used in conjunction with [Realtime Templates](https://githu
 $ npm install json-context
 ```
 
-None of this stuff is up on NPM yet...
+## Example
 
-## AJAX is so 2005...
+See [Realtime Templates](https://github.com/mmckegg/realtime-templates) for example usage.
 
-We don't want to wait for loading. **Ajax makes you wait all the time.**
+## API
 
-What we need is instant. After I load a page, everything should be able to be accessed instantly. If something changes after I load the page, that should be magically pushed to me... I shouldn't have to ask for it, and I shouldn't have to wait for it.
+### require('json-context')(data, options)
 
-The only time that loading is acceptable is when switching contexts - i.e. switching jobs/clients/projects/posts/pages. But it needs to be major to justify a load - because in that case we're used to it. It's called loading a web page. Browsers were designed to work this way ... none of this "Please watch this fancy Ajax loading graphic while I waste your time loading stuff I should have already had ready for you".. and no more parts of the page still loading etc.
+Pass in starting data. Returns event emitting **datasource**.
 
-## JSON Context Is A New Way To Write Data-Backed Sites
+Options:
 
-The first step is deciding **all of the data needed to render a page** and the most efficient structure for that data. This is as simple as building a JSON object.
+- dataFilters: passed to the inner instance of [JSON Query](https://github.com/mmckegg/json-query)
+- matchers: passed to the inner instance of [JSON Change Filter](https://github.com/mmckegg/json-change-filter) - basically a routing system - where to put incoming objects, and who is allowed to change what. 
 
-```js
-  
-  var data = {
-    post: {
-      _id: 'abc123',
-      type: 'post',
-      title: "A Blog Post",
-      description: "Testing a blog post",
-      body: "It works!",
-      date: 1333677084216
-    },
-    
-    users: {
-      'abc234': {
-        _id: 'abc234',
-        type: 'user',
-        name: 'Matt McKegg',
-        role: 'admin'
-      }
-    },
-    
-    current_user_id: 'abc234',
-    
-    comments: [
-      {
-        _id: 'cba123',
-        type: 'comment',
-        user_id: null,
-        post_id: 'abc123',
-        anonymous_user: {name: 'Steve', email: 'steve@anonymous.org'}, // of course only include the email if current user is admin
-        body: "Your site's so fast! Want to exchange links?"
-      },
-      {
-        _id: 'cba234',
-        type: 'comment',
-        user_id: 'abc234', // happens to be the ID of the admin user -- see users above
-        post_id: 'abc123',
-        body: "Thanks, it's because I'm using Node.js with JSON Context. Sorry, I don't want to link to your site because it's built with php..."
-      }
-    ]
-  }
-```
+### datasource.pushChange(object, changeInfo)
 
-The data can come from anywhere... Mysql, CouchDB, JSON files ... it's up to you. It just needs to be clearly identifiable. Normally this means each item needs to have a unique ID.
+Pushes an object into the datasource using the specified matchers to decide where it should go. If the object already existed in the datasource (as decided by the matcher), it will be updated to match the attributes of the object being pushed in. 
 
-### On The Server
+Because of this, if you have a reference to the original object in the datasource (say when you are binding to it), the reference will still work after the new version has been pushed in. This allows the complete object to be bounced around the intertubes or wherever and only update existing objects rather than creating new references all the time.
 
-Once we have the data we need nicely packaged up in a single JSON object, it's time to use that data to render our web page.
+**changeInfo**: 
+  - source: 'user' or 'server'
 
-Here's a stupid simple template example using **embedded js (ejs)**.... Don't try this at home (instead use [Realtime Templates](https://github.com/mmckegg/realtime-templates))
+### datasource.query(query, context, options)
 
-```html
+Queries the data stored using [JSON Query](https://github.com/mmckegg/json-query) and returns an object representing the result and other useful info (especially when doing databinding)
 
-  <h1 id='post_title'><%= post.title %></h1>
-  <div id='post_body'><%= post.body %></div>
-  
-  <h2>Comments</h2>
-  <div id='comments'> 
-    <% comments.forEach(function(comment){ %>
-      
-      <div id='comment_<%= comment.id %>'>
-        <h3 class='name'><%= (users[comment.user_id] || comment.anonymous_user).name %></h3>
-        <div class='body'><%= comment.body %></div>
-      </div>
-      
-    <% }) %>
-  </div>
-```
+**context**: (optional) specifiy a target for `.` queries to get their data. This is used when matcher queries execute (e.g. `item`) and is set to the new object being pushed and great when using repeaters when template/data binding.
 
-Make sure to include the data on the page. Here we use [Browserify](https://github.com/substack/node-browserify) to require the browser version of `jsonContext` (just like we would in our Node.js code). This creates a wrapper around our data that lets us query it, push changes to it, and get events when things change (for data binding).
+**options**: additional options to be passed to the inner JSON Query.
 
-```html
-  <script src='/browserify.js'></script>
-  <script>
-    window.context = require('json-context')(<%= JSON.stringify(data) %>)
-  </script>
-```
+Returns an object with the following keys:
+  - value: the result of the query
+  - parents: a list of parent objects and the keys that lead to the next layer
+  - references: an array of objects that if changed would invalidate the result of the query - we can use this to add binding metadata.
+  - key: the array index or key of the resulting value
 
-### On The Client (browser in this case)
+### datasource.get(query, context, options)
 
-So far so good, the browser has rendered the page. Nothing new here. But now we have access to **all of the data** the server used to render the page.
+A shortcut for datasource.get(...).value - exactly the same, but only returns the value of the query, not the other info.
 
-In this example we tribute the good old days of the internet... where sites were friendly and **popup alerts** were cool.
+### datasource.on('change', function(object, changeInfo))
+
+The datasource emits a change event every time a pushed object is matched. The changeInfo contains the infomation supplied from [JSON Change Filter](https://github.com/mmckegg/json-change-filter) including `action`, `matcher`, and `original`. This can be used to determine when to update bound elements, etc.
+
+## Matchers
+
+Matchers are a collection of filters and queries that explain what to do with incoming objects. 
+
+- filter: conditions that must be satisfied in order to let the object through
+  - match: This filter dictates whether this matcher is resposible for the object or not - the base match. If `changeInfo.source` is 'server', the change will be allowed and other filters bypassed, otherwise the following filters are checked
+  - changes: What changes to allow - or true to allow all
+  - append: Whether this object can be added to the collection - filter or boolean
+  - update: If the object already existed, whether it can be updated - filter or boolean
+  - remove: If the object exists and an object matching with a _delete key is pushed - filter or boolean
+- collection: a query specifying the collection the object will be added to (optional)
+- item: a query specifying how to find existing object and where to put the object if no collection was specified. 
+
+Here's a simple matcher that will save any incoming object with the ID of 'abc123' and the type 'post' into the key 'current_post'.
 
 ```js
-
-  var userName = window.context.get("users[{current_user_id}].name")
-  alert('Hi ' + userName + ', welcome to my blog!!')
-```
-
-That was an example of using [JSON Query](https://github.com/mmckegg/json-query) which is *included for free* with every JSON Context. You can use it to pluck single values or **nested queries** like we see above. `current_user_id` is one query and the result is inserted into the outer query to end up with something that looks like `users[abc234].name` which is then run against the original data we provided.
-
-#### OK, so what happens when the data changes on the server?
-
-Nothing, yet. So far this is all pretty useless, apart from keeping your templates nicely organized (no code should be in your templates, etc).
-
-What we need to do is somehow wire up a change stream from the server to the client. [Shoe](https://github.com/substack/shoe) is an excellent choice for this. 
-
-
-### Back on the server
-
-Here is an example change subscription service using [Shoe](https://github.com/substack/shoe):
-
-```js
-
-  var subscribers = []
-  var shoe = require('shoe')
-  
-  var publisher = shoe(function(stream){
-    
-    // add the subscription
-    subscribers.push(stream)
-    
-    stream.on('end', function () {
-      // remove the subscription
-      var index = subscribers.indexOf(stream)
-      subscribers.splice(index, 1)
-    });
-    
-  })
-  
-  
-  function pushChange(object){
-    var data = JSON.stringify(object)
-    subscribers.forEach(function(stream){
-      stream.write(data + '\n')
-    })
-  }
-  
-  publisher.install(httpServer, '/changes')
-  
-```
-
-Let's hook in to the CouchDB changes feed using [Follow](https://github.com/iriscouch/follow) and push every change.
-
-```js
-  var follow = require('follow');
-  follow({db: "http://localhost:5984/blog", include_docs: true}, function(err, change) {
-    if(!err){
-      pushChange(change.doc)
+{
+  filter: {
+    match: {
+      id: 'abc123',
+      type: 'post'
     }
-  })
+  },
+  item: 'current_post'
+}
 ```
 
-### Now it's time to subscribe on the client
-
-The part we've all been waiting for. Let's make this site work in realtime!
-
-Once again let's use [Browserify](https://github.com/substack/node-browserify) to pull in the browser version of [Shoe](https://github.com/substack/shoe)
+This one stores a collection of all users. If a new user is pushed in, will be stored, if an existing user is passed in, the original will be updated to match the attributes of the object.
 
 ```js
-
-  // client-side require using browserify
-  var shoe = require('shoe')
-```
-
-And connect to the publisher we set up on the server (using [split](https://github.com/dominictarr/split) to ensure we receive whole lines):
-
-```js
-
-  var split = require('split')
-  
-  shoe('/changes').pipe(split()).on('data', function(line){
-    window.context.pushChange(JSON.parse(line), {source: 'server'})
-  })
-
-```
-
-#### So what's this `pushChange` thing?
-
-This is where things start to get interesting. Let's back up a little and add a few things to our original data object.
-
-```js
-  
-  var data = {
-    post: {
-      _id: 'abc123'
-      type: 'post',
-      title: "A Blog Post",
-      description: "Testing a blog post",
-      body: "It works!",
-      date: 1333677084216
-    },
-    users: {
-      'abc234': {
-        _id: 'abc234',
-        type: 'user',
-        name: 'Matt McKegg',
-        role: 'admin'
-      }
-    },
-    current_user_id: 'abc234',
-    comments: [...],
-    
-    // new stuff here!
-    $matchers: [
-      
-      { // subscribe to changes on blog post
-        filter: {
-          match: {
-            _id: 'abc123',
-            type: 'post'
-          }
-        },
-        item: 'post' // a JSON Query telling where to update
-      },
-      
-      
-      { // subscribe to comments (both new and updates)
-        filter: {
-          match: {
-            post_id: 'abc123',
-            type: 'comment'
-          }
-        },
-        item: 'comments[_id={._id}]',   // a JSON Query telling where to find item to update
-        collection: 'comments'          // a JSON Query telling where to add new items
-      },
-      
-      
-      { // subscribe to users (maybe I might change my name or something?)
-        filter: {
-          match: {
-            type: 'user'
-          }
-        },
-        item: 'users[{._id}]',  // JSON Query: where to find item to update
-        collection: 'users',    // JSON Query: where to add new items
-        collectionKey: '._id'   // as the collection in this case is not an array, what should it's key be?
-      }
-      
-    ]
-  }
-```
-
-Whenever a JSON Context object receives a `pushChange` command, it runs the new change against every matcher stored in `data._matchers` using [JSON Change Filter](https://github.com/mmckegg/json-change-filter).
-
-It uses this information to update the local context (`window.context`) and generates events describing how it modified the data so that we know what to change in the DOM.
-
-### Let's bind our context to our DOM
-
-So now that we have our little pub/sub going on, all changes made to the database are automatically updating the relevant parts of our local context (`window.context`).
-
-Let's tell the post elements how to automatically update if needed (by extending the dom with some hack functions):
-
-```js
-  
-  var postTitleElement = document.getElementById('post_title')
-  postTitleElement.update = function(object){
-    postTitleElement.innerHTML = object.title //this should really be html escaped...
-  }
-  
-  var postBodyElement = document.getElementById('post_body')
-  postBodyElement.update = function(object){
-    postBodyElement.innerHTML = object.body
-  }
-  
-  // add some metadata to the post showing what elements should be refreshed when the post changes
-  var post = window.context.get('post')
-  post.$elements = [postTitleElement, postBodyElement]
-
-```
-
-And now comments:
-
-```js
-  
-  function generateCommentElement(comment){
-    // code to create and return a new DOM element based on the new object
-  }
-
-  var commentsElement = document.getElementById('comments')
-  commentsElement.append = function(object){
-    commentsElement.appendChild(generateCommentElement(object))
-  }
-  
-  var comments = window.context.get('comments')
-  comments.$collectionElements = [commentsElement]
-  
-  // loop over all comments in the context and bind to each
-  comments.forEach(function(comment){
-    
-    var commentElement = commentsElement.getElementById('comment_' + comment.id)
-    commentElement.update = function(){
-      var commentNameElement = commentElement.getElementsByClassName('name')
-      var user = window.context.get('users[?]', comment.user_id) || comment.anonymous_user
-      commentNameElement.innerHTML = user.name
-      
-      var commentBodyElement = commentElement.getElementsByClassName('body')
-      commentBodyElement.innerHTML = comment.body
-      
+{
+  filter: {
+    match: {
+      type: 'user'
     }
-    
-    comment.$elements = [commentElement]
-  })
+  },
+  item: 'users[id={.id}]',
+  collection: 'users'
+}
 ```
 
-### What's with the '$' keys?
+To make things a little more interesting, this filter groups tasks by `heading_id`, and allows tasks to be added, updated, removed, or moved to another heading, but only allows the user to specify certain fields and requires them to assign their own user_id.
 
-In case you're wondering about the '$' keys (e.g. `$elements`) - there's nothing special about these, except that they are ignored by the updater and left in place. What this means is you can use them for storing metadata about an object. Even after the object is updated by `pushChange` the meta data will still be there. 
+```js
+{
+  filter: {
+    match: {
+      type: 'task'
+    },
+    changes: {
+      user_id: 12, // the current user's id
+      heading_id: {$present: true},
+      description: {$present: true}
+    },
+    update: true,
+    remove: true,
+    append: true
+  },
+  item: 'tasks_by_heading[][id={.id}]',
+  collection: 'tasks_by_heading[{.heading_id}]'
+}
+
+## Databinding
+
+The best way to handle data binding with JSON Context is using $meta attributes on the objects, then linking back to the object from the dom-node. 
+
+When objects are updated, JSON Context ignores any attribute that starts with `$` and will leave in place. What this means is you can use them for storing metadata about an object. Even after the object is updated by `pushChange` the meta data will still be there. 
 
 The only way a '$' key can get lost is if the item is removed. Makes them great for storing binding info.
 
-#### But this still won't actually do anything yet
+### Basic example (don't try this at home variety)
 
-We need to subscribe to the `change` event on `window.context`
+(instead use [Realtime Templates](https://github.com/mmckegg/realtime-templates))
 
 ```js
-  
-  window.context.on('change', function(object, changeInfo){
-  
-    if (changeInfo.action === 'append'){
-      
-      ;(changeInfo.collection.$collectionElements || []).forEach(function(collectionElement){
-        collectionElement.append && collectionElement.append(object)
-      })
-      
-    } else if (changeInfo.action === 'remove'){
-      
-      ;(object.$elements || []).forEach(function(element){
-        element.parentNode.removeChild(element)
-      })
-      
-    } else if (changeInfo.action === 'update'){
-      ;(object.$elements || []).forEach(function(element){
-        element.update && element.update(object)
-      })
+var datasource = require('json-context')({
+  comments: [
+    {id: 1, type: 'comment', name: 'Matt', body: 'Hello test 123'}
+  ]
+}, {
+  matchers: [
+    { 
+      filter: {
+        match: {type: 'comment'},
+        update: true
+      },
+      item: 'comments[id={.id}]',
+      collection: 'comments'
     }
-    
+  ],
+  dataFilters: {}
+})
+
+datasource.on('change', function(object, changeInfo){
+  if (changeInfo.action === 'update'){
+    object.$boundElements && object.$boundElements.forEach(function(element){
+      var queryResult = datasource.query(element.getAttribute('data-bind'))
+      element.innerHTML = escapeHtml(queryResult.value)
+    })
+  } else if (changeInfo.action === 'remove'){
+    ...
+  } else if (changeInfo.action === 'update'){
+    ...
+  }
+})
+
+var elementsToBind = document.querySelectorAll('[data-bind]')
+
+elementsToBind.forEach(function(element){
+  var queryResult = element.getAttribute('data-bind')
+  element.innerHTML = escapeHtml(queryResult.value)
+
+  queryResult.references.forEach(function(reference){
+    reference.$boundElements = reference.$boundElements || []
+    reference.$boundElements.push(element)
   })
-  
+
+})
 ```
-
-## WOW OMG!! EVERYTHING WORKS IN REALTIME!!! IT'S MAGIC!!
-
-No it's not. You did all the work. JSON Context is just one tool that made it easier.
-
-Here are some more tools to make it even easier:
-
-  - [JSON Syncer](http://github.com/mmckegg/node-json-syncer) - Handles all of the change pushing between server and client. Allows subscribing to only specific events - no need to overload every user with every little thing no matter how irrelevant. Also provides a way to send the user's changes back to the server.
-  - [Realtime Templates](http://github.com/mmckegg/realtime-templates) - This is where it all comes together. Write your views in 100% pure HTML markup. You can bind elements using JSON Query to your context, and create repeating areas, conditionals, partials, and much more. The server renders the initial page, but best part is that the view is automatically shared with the browser so **you don't need to write a single line of refresh code**. The view already knows how to update itself. Things start to actually be magic at this point.
