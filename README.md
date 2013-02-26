@@ -73,6 +73,7 @@ Matchers are a collection of filters and queries that explain what to do with in
   - remove: If the object exists and an object matching with a _delete key is pushed - filter or boolean
 - collection: a query specifying the collection the object will be added to (optional)
 - item: a query specifying how to find existing object and where to put the object if no collection was specified. 
+- collectionKey: Specify a query to use to generate the objects key if the collection is not an array, but rather an object - good for building lookups (optional)
 
 Here's a simple matcher that will save any incoming object with the ID of 'abc123' and the type 'post' into the key 'current_post'.
 
