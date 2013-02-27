@@ -274,13 +274,17 @@ module.exports.obtainMerge = function(object, changes){
   return result
 }
 
+module.exports.safeStringify = safeStringify
+
 function deepClone(object){
-  return JSON.parse(JSON.stringify(object, function(k,v){
-    // strip meta data from cloned
+  return JSON.parse(safeStringify(object))
+}
+function safeStringify(object){
+  return JSON.stringify(object, function(k,v){
     if (!isMeta(k)){
       return v
     }
-  }))
+  })
 }
 
 function mergeClone(){
