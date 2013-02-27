@@ -15,10 +15,14 @@ module.exports = function(data, options){
       originalHandler: function(object, changeInfo){
         var original = null
         changeInfo.matchers.some(function(matcher){
-          original = context.get(matcher.item, object)
+          original = context.get(matcher.item, object) || null
           return !!original
         })
+
         return original
+      },
+      queryHandler: function(query, changeInfo){
+        return context.get(query, changeInfo)
       },
       matchers: function(object, changeInfo, iterate){
         context.matchers.forEach(iterate)

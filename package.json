@@ -14,7 +14,7 @@
   },
   "dependencies": {
     "json-query": "*",
-    "json-change-filter": "*",
+    "json-change-filter": "~0.1.0",
     "json-change-stream": "*"
   },
   "devDependencies": {
