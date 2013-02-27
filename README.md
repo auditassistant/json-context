@@ -65,26 +65,26 @@ The datasource emits a change event every time a pushed object is matched. The c
 
 Matchers are a collection of filters and queries that explain what to do with incoming objects. 
 
-- filter: conditions that must be satisfied in order to let the object through
-  - match: This filter dictates whether this matcher is resposible for the object or not - the base match. If `changeInfo.source` is 'server', the change will be allowed and other filters bypassed, otherwise the following filters are checked
-  - changes: What changes to allow - or true to allow all
-  - append: Whether this object can be added to the collection - filter or boolean
-  - update: If the object already existed, whether it can be updated - filter or boolean
-  - remove: If the object exists and an object matching with a _delete key is pushed - filter or boolean
-- collection: a query specifying the collection the object will be added to (optional)
+- ref: give the matcher a unique name so it can be refered to (optional)
 - item: a query specifying how to find existing object and where to put the object if no collection was specified. 
+- collection: a query specifying the collection the object will be added to (optional)
 - collectionKey: Specify a query to use to generate the objects key if the collection is not an array, but rather an object - good for building lookups (optional)
+- match: This filter is checked using `jsonChangeFilter.check` to see if resposible for the object or not. It the change will be allowed if source is `server` or `database`. Otherwise the allow queries must pass. If no allow queries are specified, `user` changes will not be accepted. (required)
+- allow: (all optional) - each option takes either a single query or array
+  - change: All queries must return `true` for all types of changes. 
+  - append: If the object is being appended, only allow if the specified queries return `true`.
+  - update: If the object is being updated (an original was found), only allow if the specified queries return `true`.
+  - remove: If the object is being updated (has `_deleted: true`), only allow if the specified queries return `true`.
+
 
 Here's a simple matcher that will save any incoming object with the ID of 'abc123' and the type 'post' into the key 'current_post'.
 
 ```js
 {
-  filter: {
-    match: {
-      id: 'abc123',
-      type: 'post'
-    }
-  },
+  match: {
+    id: 'abc123',
+    type: 'post'
+  }
   item: 'current_post'
 }
 ```
@@ -93,35 +93,78 @@ This one stores a collection of all users. If a new user is pushed in, will be s
 
 ```js
 {
-  filter: {
-    match: {
-      type: 'user'
-    }
-  },
+  match: {
+    type: 'user'
+  }
   item: 'users[id={.id}]',
   collection: 'users'
 }
 ```
 
-To make things a little more interesting, this filter groups tasks by `heading_id`, and allows tasks to be added, updated, removed, or moved to another heading, but only allows the user to specify certain fields and requires them to assign their own user_id.
+To make things a little more interesting, this example groups tasks by `heading_id`, and allows tasks to be added, updated, removed, or moved to another heading, but only allows the user to specify certain fields and requires them to assign their own user_id (we'll use our own custom allow queries to do this).
 
 ```js
-{
-  filter: {
-    match: {
+var filters = {
+  allowChange: function(input, params){
+    if (input.action === 'remove'){
+      return true
+    } else {
+      return check(changeInfo, {
+        equal: {user_id: params.data.current_user_id},
+        changes: ['optional_field'],
+        required: ['heading_id', 'description'],
+        appendChanges: ['new_item_field']
+      })
+    }
+  }
+}
+
+var data = {
+  current_user_id: 123
+}
+
+var matchers = [
+  { match: {
       type: 'task'
     },
-    changes: {
-      user_id: 12, // the current user's id
-      heading_id: {$present: true},
-      description: {$present: true}
+    allow: {
+      change: ':allowChange'
     },
-    update: true,
-    remove: true,
-    append: true
-  },
-  item: 'tasks_by_heading[][id={.id}]',
-  collection: 'tasks_by_heading[{.heading_id}]'
+    item: 'tasks_by_heading[][id={.id}]',
+    collection: 'tasks_by_heading[{.heading_id}]'
+  }
+]
+
+var context = jsonContext(data, {dataFilters: filters, matchers: matchers})
+
+function check(changeInfo, options){
+  var changeKeys = [].concat(options.changes).concat(options.required)
+  if (options.required && !checkRequired(options.required, changeInfo)){
+    return false
+  }
+  if (options.changes && !checkChanges(changeKeys, changeInfo, options.appendChanges)){
+    return false
+  }
+  if (options.equal && !checkEqual(options.equal, changeInfo)){
+    return false
+  }
+  return true
+}
+
+function checkRequired(required, changeInfo){
+  return required.every(function(key){
+    return !!changeInfo.object[key]
+  })
+}
+function checkChanges(allowed, changeInfo, appendExceptions){
+  return Object.keys(changeInfo.changes).every(function(key){
+    return !!~allowed.indexOf(key) || (appendExceptions && !!~appendExceptions.indexOf(key))
+  })
+}
+function checkEqual(equal, changeInfo){
+  return Object.keys(equal).every(function(key){
+    return changeInfo.object[key] == equal[key]
+  })
 }
 ```
 
@@ -145,10 +188,11 @@ var datasource = require('json-context')({
 }, {
   matchers: [
     { 
-      filter: {
-        match: {type: 'comment'},
-        update: true
-      },
+      match: {type: 'comment'},
+      allow: {
+        update: true,
+        append: true
+      }
       item: 'comments[id={.id}]',
       collection: 'comments'
     }

@@ -2,7 +2,7 @@
   "author": "Matt McKegg <matt@wetsand.co.nz> (http://twitter.com/MattMcKegg)",
   "name": "json-context",
   "description": "Create a single object containing all data required to render a view/page that provides an event stream for syncing with server and data-binding. Browserify compatible.",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "homepage": "http://github.com/mmckegg/json-context",
   "repository": {
     "type": "git",
