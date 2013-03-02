@@ -43,12 +43,33 @@ module.exports = function(data, options){
   context.matchers = options.matchers || context.data.$matchers || []
   context._isContext = true
   
+  // helpers for getting stuff done, fast.
   context.get = function(path, object, options){
     return context.query(path, object, options).value
   }
   context.obtain = function(path, object, options){
-    return deepClone(context.query(path, object, options).value)
+    if (path instanceof Object && !Array.isArray(path)){
+      // we already have the result, so clone and return it
+      return deepClone(path)
+    } else { 
+      // run the query and clone result
+      return deepClone(context.query(path, object, options).value)
+    }
   }
+  context.obtainMerge = function(path, changes, options){
+    var result = context.obtain(path, changes, options)
+    if (changes){
+      Object.keys(changes).forEach(function(key){
+        result[key] = changes[key]
+      })
+    }
+    return result
+  }
+  context.update = function(query, changes, options){
+    var object = context.obtainMerge(query, changes, options)
+    context.pushChange(object)
+  }
+
   context.query = function(path, object, options){
     // set up options
     var defaultOptions = {rootContext: context.data, context: object, filters: context.dataFilters}
@@ -80,6 +101,11 @@ module.exports = function(data, options){
     } else {
       return {}
     }
+  }
+
+  context.toJSON = function(){
+    // TODO: should strip $meta from context.data
+    return JSON.stringify({data: context.data, matchers: context.matchers})
   }
 
   
@@ -279,13 +305,7 @@ module.exports.safeStringify = safeStringify
 function deepClone(object){
   return JSON.parse(safeStringify(object))
 }
-function safeStringify(object){
-  return JSON.stringify(object, function(k,v){
-    if (!isMeta(k)){
-      return v
-    }
-  })
-}
+
 
 function mergeClone(){
   var result = {}
@@ -298,6 +318,14 @@ function mergeClone(){
     }
   }
   return result
+}
+
+function safeStringify(object){
+  return JSON.stringify(object, function(k,v){
+    if (!isMeta(k)){
+      return v
+    }
+  })
 }
 
 function isMeta(key){
