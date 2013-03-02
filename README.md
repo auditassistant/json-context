@@ -35,15 +35,35 @@ Pushes an object into the datasource using the specified matchers to decide wher
 
 Because of this, if you have a reference to the original object in the datasource (say when you are binding to it), the reference will still work after the new version has been pushed in. This allows the complete object to be bounced around the intertubes or wherever and only update existing objects rather than creating new references all the time.
 
-**changeInfo**: 
-  - source: 'user' or 'server' (also available: 'cache', 'database' which like server, bypass the change filters other than the base match)
+**object**: The complete object that has been changed, created, or deleted. 
+
+**changeInfo** options:
+  - **source**: either `server` or `user`. If server the change will not be validated and will be applied to the context regardless. If user, the matcher must explicity allow the type of change ('update', 'append' or 'remove').
   - any other metadata that we may want to access further down stream.
 
-### datasource.query(query, context, options)
+#### Server Changes
+  
+When a changed object comes down the stream from the server, call `context.pushChange(changedObject, {source: 'server'})` and the change will be merged into the context (as long as there is a corresponding matcher). 
+
+#### Browser Changes
+
+If you want to **update** an object in the browser with a form for example, you must first obtain a copy of the object you wish to change. You can use `context.obtain(query)` to do this, or clone an object using `jsonContext.obtain(element.source)`. Once you have this copy, make the desired changes, then push back in using `context.pushChange(changedObject, {source: 'user'})`. The context will check the matcher to ensure the change they have requested is allowed.
+
+To **delete** an object, obtain in the same way as changing, but add the key `_deleted` with the value `true`.
+
+```js
+var object = window.context.obtain(['comments[][id=?]', 1]) // get a copy of the object
+object._deleted = true
+window.context.pushChange(object, {source: 'user'})
+```
+
+If you want to **append** a new object, just push it directly. As long as it has attributes corresponding to the matcher, everything should just work.
+
+### datasource.query(query, localContext, options)
 
 Queries the data stored using [JSON Query](https://github.com/mmckegg/json-query) and returns an object representing the result and other useful info (especially when doing databinding)
 
-**context**: (optional) specifiy a target for `.` queries to get their data. This is used when matcher queries execute (e.g. `item`) and is set to the new object being pushed and great when using repeaters when template/data binding.
+**localContext**: (optional) specifiy a target for `.` queries to get their data. This is used when matcher queries execute (e.g. `item`) and is set to the new object being pushed and great when using repeaters when template/data binding.
 
 **options**: additional options to be passed to the inner JSON Query.
 
@@ -53,13 +73,29 @@ Returns an object with the following keys:
   - references: an array of objects that if changed would invalidate the result of the query - we can use this to add binding metadata.
   - key: the array index or key of the resulting value
 
-### datasource.get(query, context, options)
+### datasource.get(query, localContext, options)
 
-A shortcut for datasource.get(...).value - exactly the same, but only returns the value of the query, not the other info.
+A shortcut for datasource.query(...).value - exactly the same, but only returns the value of the query, not the other info.
 
 ### datasource.on('change', function(object, changeInfo))
 
 The datasource emits a change event every time a pushed object is matched. The changeInfo contains the infomation supplied from [JSON Change Filter](https://github.com/mmckegg/json-change-filter) including `action`, `matcher`, and `original`. This can be used to determine when to update bound elements, etc.
+
+## Helper Methods
+
+Some handy functions that get stuff done, fast.
+
+### datasource.obtain(queryOrObject, localContext)
+
+Obtains a deep copy of the result of the query, or if object passed in, deep clones it.
+
+### datasource.obtainMerge(queryOrObject, changes)
+
+Same as `datasource.obtain` but returns a copy of the object with the attributes of `changes` merged in.
+
+### datasource.update(queryOrObject, changes)
+
+Does a `datasource.obtainMerge` then pushes it back into the database with `source: 'user'`. Easy one line updates - good for console use.
 
 ## Matchers
 
@@ -109,7 +145,7 @@ var filters = {
     if (input.action === 'remove'){
       return true
     } else {
-      return check(changeInfo, {
+      return check(input, {
         equal: {user_id: params.data.current_user_id},
         changes: ['optional_field'],
         required: ['heading_id', 'description'],
