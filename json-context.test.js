@@ -48,21 +48,17 @@ var data = {
 var matchers = [
 
   { // subscribe to changes on blog post
-    filter: {
-      match: {
-        _id: 'abc123',
-        type: 'post'
-      }
+    match: {
+      _id: 'abc123',
+      type: 'post'
     },
     item: 'post' // a JSON Query telling where to update
   },
   
   { // subscribe to comments (both new and updates)
-    filter: {
-      match: {
-        post_id: 'abc123',
-        type: 'comment'
-      }
+    match: {
+      post_id: 'abc123',
+      type: 'comment'
     },
     item: 'comments[_id={._id}]',   // a JSON Query telling where to find item to update
     collection: 'comments'          // a JSON Query telling where to add new items
@@ -70,10 +66,8 @@ var matchers = [
   
   
   { // subscribe to users (maybe I might change my name or something?)
-    filter: {
-      match: {
-        type: 'user'
-      }
+    match: {
+      type: 'user'
     },
     item: 'users[{._id}]',  // JSON Query: where to find item to update
     collection: 'users',    // JSON Query: where to add new items
