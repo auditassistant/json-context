@@ -4,9 +4,9 @@ This module allows a server to create a JSON Context - single object that suppor
 
 The idea is it works in a similar way to your database (well depends on the database), using a update whole object at once (i.e. row/document based) aproach. Any changes that come off our database can be streamed straight in and it will figure out what local objects and fields to update, and notify that the object has been changed.
 
-It is intended to be used in conjunction with [Realtime Templates](https://github.com/mmckegg/realtime-templates) however can be used standalone if that's what you're into.
+It's mostly a wrapper around [JSON Query](https://github.com/mmckegg/json-query) adding the ability to build contexts with JSON queries and stream changes.
 
-It's mostly a wrapper around [JSON Query](https://github.com/mmckegg/json-query) and [JSON Change Filter](https://github.com/mmckegg/json-change-filter) making it easy to get up and running with object change streams and hook up to data on both the server and client.
+It is intended to be used in conjunction with [Realtime Templates](https://github.com/mmckegg/realtime-templates) however can be used standalone if that's what you're into.
 
 ## Installation
 
@@ -16,16 +16,16 @@ $ npm install json-context
 
 ## Example
 
-See [Realtime Templates](https://github.com/mmckegg/realtime-templates) for example usage.
+See [Realtime Templates](https://github.com/mmckegg/realtime-templates) and [ContextDB](https://github.com/mmckegg/contextdb) for example usage.
 
 ## API
 
-### require('json-context')(data, options)
+### require('json-context')(options)
 
-Pass in starting data. Returns event emitting **datasource**.
+Returns event emitting **datasource**.
 
 Options:
-
+- data: optional starting object (for params, or when deserializing existing context)
 - dataFilters: passed to the inner instance of [JSON Query](https://github.com/mmckegg/json-query)
 - matchers: passed to the inner instance of [JSON Change Filter](https://github.com/mmckegg/json-change-filter) - basically a routing system - where to put incoming objects, and who is allowed to change what. 
 
@@ -35,19 +35,17 @@ Pushes an object into the datasource using the specified matchers to decide wher
 
 Because of this, if you have a reference to the original object in the datasource (say when you are binding to it), the reference will still work after the new version has been pushed in. This allows the complete object to be bounced around the intertubes or wherever and only update existing objects rather than creating new references all the time.
 
+Returns an array detailing the changes.
+
 **object**: The complete object that has been changed, created, or deleted. 
 
 **changeInfo** options:
-  - **source**: either `server` or `user`. If server the change will not be validated and will be applied to the context regardless. If user, the matcher must explicity allow the type of change ('update', 'append' or 'remove').
-  - any other metadata that we may want to access further down stream.
-
-#### Server Changes
-  
-When a changed object comes down the stream from the server, call `context.pushChange(changedObject, {source: 'server'})` and the change will be merged into the context (as long as there is a corresponding matcher). 
+  - **verifiedChange**: optional - set to true if you want to override the validation/permission checking. Good for syncing with trusted sources such as a primary database server.
+  - any other metadata that we may want to access further down stream - it will be emitted with the change event.
 
 #### Browser Changes
 
-If you want to **update** an object in the browser with a form for example, you must first obtain a copy of the object you wish to change. You can use `context.obtain(query)` to do this, or clone an object using `jsonContext.obtain(element.source)`. Once you have this copy, make the desired changes, then push back in using `context.pushChange(changedObject, {source: 'user'})`. The context will check the matcher to ensure the change they have requested is allowed.
+If you want to **update** an object in the browser with a form for example, you must first obtain a copy of the object you wish to change. You can use `datasource.obtain(query)` to do this, or clone an object using `datasource.obtain(element.templateContext.source)`. Once you have this copy, make the desired changes, then push back in using `datasource.pushChange(changedObject, {source: 'user'})`. It will check the matcher to ensure the change they have requested is allowed.
 
 To **delete** an object, obtain in the same way as changing, but add the key `_deleted` with the value `true`.
 
@@ -61,7 +59,7 @@ If you want to **append** a new object, just push it directly. As long as it has
 
 ### datasource.query(query, localContext, options)
 
-Queries the data stored using [JSON Query](https://github.com/mmckegg/json-query) and returns an object representing the result and other useful info (especially when doing databinding)
+Queries the context using [JSON Query](https://github.com/mmckegg/json-query) and returns an object representing the result and other useful info (especially when doing databinding)
 
 **localContext**: (optional) specifiy a target for `.` queries to get their data. This is used when matcher queries execute (e.g. `item`) and is set to the new object being pushed and great when using repeaters when template/data binding.
 
@@ -77,9 +75,27 @@ Returns an object with the following keys:
 
 A shortcut for datasource.query(...).value - exactly the same, but only returns the value of the query, not the other info.
 
+### datasource.changeStream(defaultChangeInfo)
+
+Returns a duplex stream of line delimited json encoded text. Can be used to pipe changes between multiple JSON Context datasources, such as those created by [ContextDB](https://github.com/mmckegg/contextdb).
+
+Only changes not originating from this stream will be sent, so no chance of feedback. Multiple streams can be created and piped around the place to allow all kinds of crazy peer based syncing.
+
+**defaultChangeInfo**: (optional) see `datasource.pushChange(object, changeInfo)`
+
 ### datasource.on('change', function(object, changeInfo))
 
-The datasource emits a change event every time a pushed object is matched. The changeInfo contains the infomation supplied from [JSON Change Filter](https://github.com/mmckegg/json-change-filter) including `action`, `matcher`, and `original`. This can be used to determine when to update bound elements, etc.
+The datasource emits a change event every time a pushed object is matched. This can be used to determine when to update bound elements, etc.
+
+**changeInfo**: 
+
+- action: append, update, or remove
+- changes: the root key/values on the object that were changed
+- original: the state of the object before it was changed
+- collection: the parent object
+- key: the objects key in the collection
+- matcher: The instance of the matcher that allowed this change to come through
+- any other fields set when pushing the data in
 
 ## Helper Methods
 
@@ -89,11 +105,17 @@ Some handy functions that get stuff done, fast.
 
 Obtains a deep copy of the result of the query, or if object passed in, deep clones it.
 
-### datasource.obtainMerge(queryOrObject, changes)
+### datasource.matchersFor(object)
 
-Same as `datasource.obtain` but returns a copy of the object with the attributes of `changes` merged in.
+Returns an array of matchers that accept the object specified.
+
+### datasource.siblings(object)
+
+Returns details of the specified objects siblings `{previous, next}`.
 
 ### datasource.update(queryOrObject, changes)
+
+Same as `datasource.obtain` but returns a copy of the object with the attributes of `changes` merged in.
 
 Does a `datasource.obtainMerge` then pushes it back into the database with `source: 'user'`. Easy one line updates - good for console use.
 
@@ -105,8 +127,8 @@ Matchers are a collection of filters and queries that explain what to do with in
 - item: a query specifying how to find existing object and where to put the object if no collection was specified. 
 - collection: a query specifying the collection the object will be added to (optional)
 - collectionKey: Specify a query to use to generate the objects key if the collection is not an array, but rather an object - good for building lookups (optional)
-- match: This filter is checked using `jsonChangeFilter.check` to see if resposible for the object or not. It the change will be allowed if source is `server` or `database`. Otherwise the allow queries must pass. If no allow queries are specified, `user` changes will not be accepted. (required)
-- allow: (all optional) - each option takes either a single query or array
+- match: This filter is checked using [`JSON Filter`](https://github.com/mmckegg/json-filter) to see if resposible for the object or not.
+- allow: (all optional) - queries to check using `datasource.get` with `changeInfo` as the input. These will be bypassed if `verifiedChange` is set to `true`
   - change: All queries must return `true` for all types of changes. 
   - append: If the object is being appended, only allow if the specified queries return `true`.
   - update: If the object is being updated (an original was found), only allow if the specified queries return `true`.

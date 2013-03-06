@@ -2,28 +2,27 @@
   "author": "Matt McKegg <matt@wetsand.co.nz> (http://twitter.com/MattMcKegg)",
   "name": "json-context",
   "description": "Create a single object containing all data required to render a view/page that provides an event stream for syncing with server and data-binding. Browserify compatible.",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "homepage": "http://github.com/mmckegg/json-context",
   "repository": {
     "type": "git",
     "url": "git://github.com/mmckegg/json-context.git"
   },
-  "main": "json-context",
+  "main": "index.js",
   "scripts": {
-    "test": "tap *.test.js"
+    "test": "tap test/*.js"
   },
   "dependencies": {
     "json-query": "~0.1.0",
-    "json-change-filter": "~0.1.1",
-    "json-change-stream": "*"
+    "json-filter": "*",
+    "duplex": "~1.0.0",
+    "split": "~0.2.1",
+    "through": "~2.2.1"
   },
   "devDependencies": {
-    "tap": "*"
+    "tap": "~0.4.0"
   },
   "optionalDependencies": {},
-  "engines": {
-    "node": "*"
-  },
   "keywords": [
     "data binding",
     "json",

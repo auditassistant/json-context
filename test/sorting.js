@@ -1,9 +1,6 @@
-//TODO: test events and pipes
-//TODO: test change filters
-
 var test = require('tap').test
 
-var jsonContext = require('./json-context')
+var JsonContext = require('../')
 
 var data = {
   
@@ -63,20 +60,16 @@ var matchers = [
     item: 'links[_id={._id}]',
     collection: 'links',
     sort: {type: 'before', key: '_before', compareKey: '_id'}, // key[0]: target property // key[1]: collection identifing property
-    filter: {
-      match: {
-        type: 'link'
-      }
+    match: {
+      type: 'link'
     }
   },
   {
     item: 'moreLinks[_id={._id}]',
     collection: 'moreLinks',
     sort: {type: 'after', key: '_after', compareKey: '_id'}, // key[0]: target property // key[1]: collection identifing property
-    filter: {
-      match: {
-        type: 'otherLink'
-      }
+    match: {
+      type: 'otherLink'
     }
   }
 ]
@@ -104,7 +97,7 @@ function runTests(){
           t.equal(changeInfo.before, data.links[3], 'Before changeInfo set on change event')
         }
       })
-      context.pushChange(changedLink, {source: 'server'})   
+      context.pushChange(changedLink, {verifiedChange: true})   
       
       var newOrder = data.links.map(function(l){return l._id})
       
@@ -123,7 +116,7 @@ function runTests(){
       
       var changedLink = context.obtain('links[_id=link3]')
       changedLink._before = -1
-      context.pushChange(changedLink, {source: 'server'})   
+      context.pushChange(changedLink, {verifiedChange: true})   
       
       var newOrder = data.links.map(function(l){return l._id})
       t.deepEqual(newOrder, expectedOrder)
@@ -143,7 +136,7 @@ function runTests(){
       var changedLink = context.obtain('moreLinks[_id=link3]')
       changedLink._after = 'link1'
       
-      context.pushChange(changedLink, {source: 'server'})   
+      context.pushChange(changedLink, {verifiedChange: true})   
       
       var newOrder = data.moreLinks.map(function(l){return l._id})
       
@@ -161,7 +154,7 @@ function runTests(){
       
       var changedLink = context.obtain('moreLinks[_id=link1]')
       changedLink._after = -1
-      context.pushChange(changedLink, {source: 'server'})   
+      context.pushChange(changedLink, {verifiedChange: true})   
       
       var newOrder = data.moreLinks.map(function(l){return l._id})
       t.deepEqual(newOrder, expectedOrder)
@@ -175,7 +168,7 @@ function runTests(){
 var jsonData = JSON.stringify(data)
 function freshData(func){
   var data = JSON.parse(jsonData)
-  var context = jsonContext(data, {matchers: matchers})
+  var context = JsonContext({matchers: matchers, data: data})
   func(data, context)
 }
 
