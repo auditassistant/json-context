@@ -7,7 +7,7 @@ var mergeInto = require('./lib/merge_into')
 var obtain = require('./lib/obtain')
 var getChanges = require('./lib/get_changes')
 var checkAllowedChange = require('./lib/check_allowed_change')
-var checkSorting = require('./lib/check_sorting')
+var checkCollectionPosition = require('beforesort')
 
 var checkFilter = require('json-filter')
 
@@ -16,12 +16,19 @@ module.exports = function(options){
   var self = new EventEmitter()
   self.matchers = options.matchers || []
   self.data = options.data || {}
-  self.dataFilters = options.dataFilters || {}
+  self.dataFilters = options.dataFilters || options.filters || {}
   
 
   self.pushChange = function(object, changeInfo){
+    var matchers = null
+    if (changeInfo && changeInfo.matcher){
+      matchers = [changeInfo.matcher]
+    } else {
+      matchers = findMatchers(self.matchers, object, self.get)
+    }
 
-    return findMatchers(self.matchers, object, self.query).map(function(matcher){      
+    return matchers.map(function(matcher){   
+
       var originalQuery = self.query(matcher.item, object)
       var original = originalQuery.value
 
@@ -45,20 +52,23 @@ module.exports = function(options){
       changeInfo.changes = getChanges(changeInfo)
       changeInfo.verifiedChange = checkAllowedChange(self, changeInfo)
 
+
+
       if (changeInfo.verifiedChange){
         if (action === 'append'){
           push(append(self, matcher, object))
-          push(checkSorting(object, changeInfo))
+          push(ensureCorrectPosition(object, changeInfo))
           self.emit('change', object, changeInfo)
         } else if (action === 'update'){
           push(ensureCorrectCollection(self, matcher, object))
           push(mergeInto(original, object, {preserveKeys: matcher.preserveKeys}))
-          push(checkSorting(original, changeInfo))
+          push(ensureCorrectPosition(original, changeInfo))
           self.emit('change', original, changeInfo)
         } else if (action === 'remove' && original){
           var collection = jsonQuery.lastParent(originalQuery)
           removeAt(collection, originalQuery.key)
           push({collection: collection})
+          original._deleted = true
           self.emit('change', original, changeInfo)
         }
       }
@@ -164,6 +174,24 @@ function ensureCorrectCollection(context, matcher, object){
       }
     }
   } 
+}
+
+function ensureCorrectPosition(object, changeInfo){
+  var object = object
+  var collection = changeInfo.collection
+  var matcher = changeInfo.matcher
+
+  var shouldAvoidDuplicates = !changeInfo.external
+
+  if (matcher.sort && Array.isArray(collection)){
+
+    var sortingChange = checkCollectionPosition(object, changeInfo.collection, mergeClone(matcher.sort, {
+      shouldAvoidDuplicates: shouldAvoidDuplicates, 
+      index: changeInfo.key
+    }))
+
+    return sortingChange
+  }
 }
 
 function getCollection(context, matcher, object){
