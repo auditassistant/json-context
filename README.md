@@ -115,9 +115,7 @@ Returns details of the specified objects siblings `{previous, next}`.
 
 ### datasource.update(queryOrObject, changes)
 
-Same as `datasource.obtain` but returns a copy of the object with the attributes of `changes` merged in.
-
-Does a `datasource.obtainMerge` then pushes it back into the database with `source: 'user'`. Easy one line updates - good for console use.
+Does a `datasource.obtain`, merges in the specified `changes` then pushes it back using `datasource.pushChange`. Easy one line updates - good for console use.
 
 ## Matchers
 
