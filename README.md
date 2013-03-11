@@ -27,7 +27,7 @@ Returns event emitting **datasource**.
 Options:
 - data: optional starting object (for params, or when deserializing existing context)
 - dataFilters: passed to the inner instance of [JSON Query](https://github.com/mmckegg/json-query)
-- matchers: passed to the inner instance of [JSON Change Filter](https://github.com/mmckegg/json-change-filter) - basically a routing system - where to put incoming objects, and who is allowed to change what. 
+- matchers: route incoming objects to queries, and verify change is allowed - see [Matchers](https://github.com/mmckegg/json-context#matchers)
 
 ### datasource.pushChange(object, changeInfo)
 
