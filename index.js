@@ -113,14 +113,14 @@ module.exports = function(options){
   }
 
   // shortcut for obtain/merge/push combo
-  self.update = function(query, changes, options){
-    var result = self.obtain(path, changes, options)
+  self.update = function(query, changes, changeInfo){
+    var result = self.obtain(query, changes, options)
     if (changes){
       Object.keys(changes).forEach(function(key){
         result[key] = changes[key]
       })
     }
-    self.pushChange(result)
+    return self.pushChange(result, changeInfo)
   }
 
   // find items in collection on either side of object - good for sorting, etc
