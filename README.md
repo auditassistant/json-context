@@ -25,9 +25,10 @@ See [Realtime Templates](https://github.com/mmckegg/realtime-templates) and [Con
 Returns event emitting **datasource**.
 
 Options:
-- data: optional starting object (for params, or when deserializing existing context)
-- dataFilters: passed to the inner instance of [JSON Query](https://github.com/mmckegg/json-query)
-- matchers: route incoming objects to queries, and verify change is allowed - see [Matchers](https://github.com/mmckegg/json-context#matchers)
+
+- **data**: optional starting object (for params, or when deserializing existing context)
+- **dataFilters**: passed to the inner instance of [JSON Query](https://github.com/mmckegg/json-query)
+- **matchers**: route incoming objects to queries, and verify change is allowed - see [Matchers](https://github.com/mmckegg/json-context#matchers)
 
 ### datasource.pushChange(object, changeInfo)
 
@@ -66,6 +67,7 @@ Queries the context using [JSON Query](https://github.com/mmckegg/json-query) an
 **options**: additional options to be passed to the inner JSON Query.
 
 Returns an object with the following keys:
+
   - value: the result of the query
   - parents: a list of parent objects and the keys that lead to the next layer
   - references: an array of objects that if changed would invalidate the result of the query - we can use this to add binding metadata.
@@ -113,7 +115,7 @@ Returns an array of matchers that accept the object specified.
 
 Returns details of the specified objects siblings `{previous, next}`.
 
-### datasource.update(queryOrObject, changes)
+### datasource.update(queryOrObject, changes, changeInfo)
 
 Does a `datasource.obtain`, merges in the specified `changes` then pushes it back using `datasource.pushChange`. Easy one line updates - good for console use.
 
