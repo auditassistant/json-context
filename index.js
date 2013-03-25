@@ -11,6 +11,8 @@ var checkCollectionPosition = require('beforesort')
 
 var checkFilter = require('json-filter')
 
+//  TODO: include (another datasource has all its changes piped in and any relevant changes piped back to it)
+//        good for multiserver contexts - e.g. account is stored in one db, projects in another.
 
 module.exports = function(options){
   var self = new EventEmitter()
@@ -27,19 +29,25 @@ module.exports = function(options){
       matchers = findMatchers(self.matchers, object, self.get)
     }
 
-    return matchers.map(function(matcher){   
+
+    var result = {accepted: false}
+
+    result.changes = matchers.map(function(matcher){   
+
 
       var originalQuery = self.query(matcher.item, object)
       var original = originalQuery.value
-
-      var action = getAction(object, original)
       
       changeInfo = mergeClone(changeInfo, {
-        action: action, 
+        action: getAction(object, original), 
         original: obtain(original), 
         matcher: matcher, 
         object: object
       })
+
+      if (original){
+        changeInfo.collection = jsonQuery.lastParent(originalQuery)
+      }
 
       function push(info){
         if (info){
@@ -52,29 +60,27 @@ module.exports = function(options){
       changeInfo.changes = getChanges(changeInfo)
       changeInfo.verifiedChange = checkAllowedChange(self, changeInfo)
 
-
-
       if (changeInfo.verifiedChange){
-        if (action === 'append'){
+        if (changeInfo.action === 'append'){
           push(append(self, matcher, object))
           push(ensureCorrectPosition(object, changeInfo))
           self.emit('change', object, changeInfo)
-        } else if (action === 'update'){
+        } else if (changeInfo.action === 'update'){
           push(ensureCorrectCollection(self, matcher, object))
           push(mergeInto(original, object, {preserveKeys: matcher.preserveKeys}))
           push(ensureCorrectPosition(original, changeInfo))
           self.emit('change', original, changeInfo)
-        } else if (action === 'remove' && original){
-          var collection = jsonQuery.lastParent(originalQuery)
-          removeAt(collection, originalQuery.key)
-          push({collection: collection})
+        } else if (changeInfo.action === 'remove' && original){
+          removeAt(changeInfo.collection, originalQuery.key)
           original._deleted = true
           self.emit('change', original, changeInfo)
         }
+        result.accepted = true
       }
-
       return changeInfo
     })
+
+    return result
   }
 
   self.query = function(query, context, options){
@@ -137,6 +143,7 @@ module.exports = function(options){
   return self
 }
 
+module.exports.obtain = obtain
 function append(context, matcher, object){
   if (matcher.collection){
     var collection = getCollection(context, matcher, object)
