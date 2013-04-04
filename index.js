@@ -66,8 +66,8 @@ module.exports = function(options){
           push(ensureCorrectPosition(object, changeInfo))
           self.emit('change', object, changeInfo)
         } else if (changeInfo.action === 'update'){
-          push(ensureCorrectCollection(self, matcher, object))
           push(mergeInto(original, object, {preserveKeys: matcher.preserveKeys}))
+          push(ensureCorrectCollection(self, matcher, object))
           push(ensureCorrectPosition(original, changeInfo))
           self.emit('change', original, changeInfo)
         } else if (changeInfo.action === 'remove' && original){
