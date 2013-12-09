@@ -190,7 +190,22 @@ function ensureCorrectPosition(object, changeInfo){
 
   var shouldAvoidDuplicates = !changeInfo.external
 
-  if (matcher.sort && Array.isArray(collection)){
+  if (changeInfo.after){
+    var previous = changeInfo.key-1
+    var startMatch = changeInfo.after === 'start' && previous == null
+
+    if (!startMatch && previous !== changeInfo.after){
+      var index = collection.indexOf(object)
+      collection.splice(index, 1)
+
+      var newIndex = changeInfo.after === 'start' ? 
+        0 : (collection.indexOf(changeInfo.after) + 1)
+
+      collection.splice(newIndex, 0, object)
+      changeInfo.key = newIndex
+    }
+
+  } else if (matcher.sort && Array.isArray(collection)){
 
     var sortingChange = checkCollectionPosition(object, changeInfo.collection, mergeClone(matcher.sort, {
       shouldAvoidDuplicates: shouldAvoidDuplicates, 

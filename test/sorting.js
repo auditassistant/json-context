@@ -163,6 +163,37 @@ function runTests(){
     })
   })
 
+  test('force start position', function(t){
+    freshData(function(data, context){
+      var originalOrder = ['link3','link4','link1','link2']
+      var expectedOrder = ['link1','link3','link4','link2']
+
+      var changedLink = context.obtain('moreLinks[_id=link1]')
+      context.pushChange(changedLink, {verifiedChange: true, after: 'start'})  
+
+      var newOrder = data.moreLinks.map(function(l){return l._id})
+      t.deepEqual(newOrder, expectedOrder)
+      
+      t.end()
+    })
+  })
+
+  test('force after position', function(t){
+    freshData(function(data, context){
+      var originalOrder = ['link3','link4','link1','link2']
+      var expectedOrder = ['link4','link1','link2', 'link3']
+
+      var lastLink = context.get('moreLinks[_id=link2]')
+      var changedLink = context.obtain('moreLinks[_id=link3]')
+      context.pushChange(changedLink, {verifiedChange: true, after: lastLink})  
+
+      var newOrder = data.moreLinks.map(function(l){return l._id})
+      t.deepEqual(newOrder, expectedOrder)
+      
+      t.end()
+    })
+  })
+
 }
 
 var jsonData = JSON.stringify(data)
