@@ -76,7 +76,13 @@ module.exports = function(options){
           self.emit('change', original, changeInfo)
         }
         result.accepted = true
+      } else if (changeInfo.errors) {
+        result.errors = result.errors || []
+        changeInfo.errors.forEach(function(error){
+          result.errors.push(error)
+        })
       }
+
       return changeInfo
     })
 
