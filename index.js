@@ -90,12 +90,21 @@ module.exports = function(options){
   }
 
   self.query = function(query, context, options){
-    options = mergeClone({
+    var opt = {
       rootContext: self.data, 
       context: context, 
       filters: self.dataFilters
-    }, options)
-    return jsonQuery(query, options)
+    }
+
+    if (options){
+      for (var k in options){
+        if (k in options){
+          opt[k] = options[k]
+        }
+      }
+    }
+
+    return jsonQuery(query, opt)
   }
 
   self.get = function(query, context, options){
