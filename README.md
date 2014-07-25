@@ -99,6 +99,12 @@ The datasource emits a change event every time a pushed object is matched. This 
 - matcher: The instance of the matcher that allowed this change to come through
 - any other fields set when pushing the data in
 
+### datasource.watch(match, cb)
+
+Pass in a JSON Filter to match objects against, and any time an object changes that matches the filter, the callback will be fired.
+
+Returns a function that when called removes watcher.
+
 ## Helper Methods
 
 Some handy functions that get stuff done, fast.

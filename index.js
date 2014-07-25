@@ -17,9 +17,25 @@ var checkFilter = require('json-filter')
 module.exports = function(options){
   var self = new EventEmitter()
   self.matchers = options.matchers || []
+  self.watchers = []
   self.data = options.data || {}
   self.dataFilters = options.dataFilters || options.filters || {}
   
+  function unwatch(watcher){
+    var id = self.watchers.indexOf(watcher)
+    if (~id){
+      self.watchers.splice(id, 1)
+    }
+  }
+
+  self.watch = function(matcher, cb){
+    var watcher = {
+      match: matcher,
+      cb: cb
+    }
+    self.watchers.push(watcher)
+    return unwatch.bind(self, watcher)
+  }
 
   self.pushChange = function(object, changeInfo){
     var matchers = null
@@ -29,6 +45,7 @@ module.exports = function(options){
       matchers = findMatchers(self.matchers, object, self.get)
     }
 
+    var watchers = findMatchers(self.watchers, object, self.get)
 
     var result = {accepted: false}
 
@@ -65,15 +82,18 @@ module.exports = function(options){
           push(append(self, matcher, object))
           push(ensureCorrectPosition(object, changeInfo))
           self.emit('change', object, changeInfo)
+          notifyWatchers(watchers, object, changeInfo)
         } else if (changeInfo.action === 'update'){
           push(mergeInto(original, object, {preserveKeys: matcher.preserveKeys}))
           push(ensureCorrectCollection(self, matcher, object))
           push(ensureCorrectPosition(original, changeInfo))
           self.emit('change', original, changeInfo)
+          notifyWatchers(watchers, original, changeInfo)
         } else if (changeInfo.action === 'remove' && original){
           removeAt(changeInfo.collection, originalQuery.key)
           original._deleted = true
           self.emit('change', original, changeInfo)
+          notifyWatchers(watchers, original, changeInfo)
         }
         result.accepted = true
       } else if (changeInfo.errors) {
@@ -82,6 +102,7 @@ module.exports = function(options){
           result.errors.push(error)
         })
       }
+
 
       return changeInfo
     })
@@ -260,5 +281,16 @@ function removeAt(collection, key){
     collection.splice(key, 1)
   } else {
     delete collection[key]
+  }
+}
+
+function notifyWatchers(watchers, object, changeInfo){
+  if (Array.isArray(watchers)){
+    for (var i=0;i<watchers.length;i++){
+      var watcher = watchers[i]
+      if (watcher && typeof watcher.cb == 'function'){
+        watcher.cb(object, changeInfo)
+      }
+    }
   }
 }

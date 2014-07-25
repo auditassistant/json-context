@@ -18,6 +18,40 @@ test('Single item key match', function(t){
 
 })
 
+test('Test watchers', function(t){
+  t.plan(1)
+  var datasource = JsonContext({matchers: [
+    {item: 'test', match: {
+      id: '1234',
+      type: 'page'
+    }}
+  ]})
+
+  // watch all changes to pages
+  var unwatch = datasource.watch({type: 'page'}, function(object, changeInfo){
+    // this should only be called once, even though it matches both below since the second one doesn't have a matcher
+    t.equal(object.id, '1234')
+  })
+
+  // push matching object
+  datasource.pushChange({
+    id: '1234', type: 'page', title: "Fancy Page"
+  }, {verifiedChange: true})
+
+  // push non-matching object
+  datasource.pushChange({
+    id: '4567', type: 'page', title: "Another Page"
+  }, {verifiedChange: true})
+
+  unwatch()
+
+  // push non-matching object
+  datasource.pushChange({
+    id: '1234', type: 'page', title: "Original Page Again"
+  }, {verifiedChange: true})
+  t.end()
+})
+
 
 
 test('Append collection match', function(t){
