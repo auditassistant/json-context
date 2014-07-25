@@ -13,10 +13,10 @@
     "test": "tap test/*.js"
   },
   "dependencies": {
-    "json-query": ">=0.3.0 <1.0.0",
-    "json-filter": "~0.0",
+    "json-query": "^1.0.0",
+    "json-filter": "~0.0.2",
     "split": "~0.2",
-    "through": "~2.2",
+    "through": "^2.3",
     "beforesort": "~0.0"
   },
   "devDependencies": {
