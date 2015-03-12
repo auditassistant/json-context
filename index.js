@@ -7,7 +7,9 @@ var mergeInto = require('./lib/merge_into')
 var obtain = require('./lib/obtain')
 var getChanges = require('./lib/get_changes')
 var checkAllowedChange = require('./lib/check_allowed_change')
-var checkCollectionPosition = require('beforesort')
+
+var floatSort = require('./lib/float_sort')
+var relativeSort = require('beforesort')
 
 var checkFilter = require('json-filter')
 
@@ -81,6 +83,7 @@ module.exports = function(options){
         if (changeInfo.action === 'append'){
           push(append(self, matcher, object))
           push(ensureCorrectPosition(object, changeInfo))
+          push(ensureSortRef(object, changeInfo))
           self.emit('change', object, changeInfo)
           notifyWatchers(watchers, object, changeInfo)
         } else if (changeInfo.action === 'update'){
@@ -223,7 +226,6 @@ function ensureCorrectPosition(object, changeInfo){
   var object = object
   var collection = changeInfo.collection
   var matcher = changeInfo.matcher
-
   var shouldAvoidDuplicates = !changeInfo.external
 
   if (changeInfo.after){
@@ -238,17 +240,42 @@ function ensureCorrectPosition(object, changeInfo){
         0 : (collection.indexOf(changeInfo.after) + 1)
 
       collection.splice(newIndex, 0, object)
-      changeInfo.key = newIndex
+      return { key: newIndex }
     }
 
   } else if (matcher.sort && Array.isArray(collection)){
 
-    var sortingChange = checkCollectionPosition(object, changeInfo.collection, mergeClone(matcher.sort, {
-      shouldAvoidDuplicates: shouldAvoidDuplicates, 
-      index: changeInfo.key
-    }))
+    if (matcher.sort.type === 'float'){
+      return floatSort(object, changeInfo.collection, matcher.sort)
+    } else {
+      return relativeSort(object, changeInfo.collection, mergeClone(matcher.sort, {
+        shouldAvoidDuplicates: shouldAvoidDuplicates, 
+        index: changeInfo.key
+      }))
+    }
+  }
+}
 
-    return sortingChange
+function ensureSortRef(object, changeInfo){
+  var index = changeInfo.key
+  var matcher = changeInfo.matcher
+  var collection = changeInfo.collection
+
+  if (matcher && matcher.sort && matcher.sort.type === 'float'){
+    var key = matcher.sort.key
+    if (object[key] == null){
+      // assign a ref if not yet specified (freshly spawned)
+      var prev = collection[index-1] ? parseFloat(collection[index-1][key]) : null
+      var next = collection[index+1] ? parseFloat(collection[index+1][key]) : null
+
+      if (prev != null && next != null){
+        object[key] = String((prev + next) / 2)
+      } else if (next != null){
+        object[key] = String(next - 1)
+      } else if (prev != null) {
+        object[key] = String(prev + 1)
+      }
+    }
   }
 }
 
