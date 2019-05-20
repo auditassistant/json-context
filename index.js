@@ -274,6 +274,8 @@ function ensureSortRef(object, changeInfo){
         object[key] = String(next - 1)
       } else if (prev != null) {
         object[key] = String(prev + 1)
+      } else {
+        object[key] = 0
       }
     }
   }
